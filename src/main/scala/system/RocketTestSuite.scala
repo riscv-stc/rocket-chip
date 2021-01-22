@@ -27,6 +27,9 @@ run-$makeTargetName: $$(addprefix $$(output_dir)/, $$(addsuffix .out, $$($makeTa
 run-$makeTargetName-debug: $$(addprefix $$(output_dir)/, $$(addsuffix .vpd, $$($makeTargetName)))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.vpd,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 
+run-$makeTargetName-fsdb: $$(addprefix $$(output_dir)/, $$(addsuffix .fsdb, $$($makeTargetName)))
+\t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.fsdb,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
+
 run-$makeTargetName-fst: $$(addprefix $$(output_dir)/, $$(addsuffix .fst, $$($makeTargetName)))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.fst,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 """
@@ -74,6 +77,8 @@ run-$kind-$env-tests: $$(addprefix $$(output_dir)/, $$(addsuffix .out, $suites))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$^ /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 run-$kind-$env-tests-debug: $$(addprefix $$(output_dir)/, $$(addsuffix .vpd, $suites))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.vpd,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
+run-$kind-$env-tests-fsdb: $$(addprefix $$(output_dir)/, $$(addsuffix .fsdb, $suites))
+\t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.fsdb,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 run-$kind-$env-tests-fst: $$(addprefix $$(output_dir)/, $$(addsuffix .fst, $suites))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.fst,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 run-$kind-$env-tests-fast: $$(addprefix $$(output_dir)/, $$(addsuffix .run, $suites))
@@ -83,6 +88,8 @@ run-$kind-tests: $$(addprefix $$(output_dir)/, $$(addsuffix .out, $targets))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$^ /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 run-$kind-tests-debug: $$(addprefix $$(output_dir)/, $$(addsuffix .vpd, $targets))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.vpd,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
+run-$kind-tests-fsdb: $$(addprefix $$(output_dir)/, $$(addsuffix .fsdb, $targets))
+\t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.fsdb,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 run-$kind-tests-fst: $$(addprefix $$(output_dir)/, $$(addsuffix .fst, $targets))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.fst,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 run-$kind-tests-fast: $$(addprefix $$(output_dir)/, $$(addsuffix .run, $targets))
