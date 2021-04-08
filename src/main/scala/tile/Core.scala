@@ -60,7 +60,7 @@ trait CoreParams {
   def minFLen: Int = 32
   def vLen: Int = 0
   def sLen: Int = 0
-  def eLen(xLen: Int, fLen: Int): Int = xLen max fLen
+  def eLen: Int = 64
   def vMemDataBits: Int = 0
 }
 
@@ -101,7 +101,7 @@ trait HasCoreParameters extends HasTileParameters {
 
   def vLen = coreParams.vLen
   def sLen = coreParams.sLen
-  def eLen = coreParams.eLen(xLen, fLen)
+  def eLen = coreParams.eLen
   def vMemDataBits = if (usingVector) coreParams.vMemDataBits else 0
   def maxVLMax = vLen
 
