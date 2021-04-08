@@ -20,7 +20,7 @@ trait CoreParams {
   val useAtomics: Boolean
   val useAtomicsOnlyForIO: Boolean
   val useCompressed: Boolean
-  val useVector: Boolean = false
+  val useVector: Boolean
   val useSCIE: Boolean
   val useRVE: Boolean
   val mulDiv: Option[MulDivParams]
@@ -54,7 +54,7 @@ trait CoreParams {
   def minFLen: Int = 32
   def vLen: Int = 0
   def sLen: Int = 0
-  def eLen(xLen: Int, fLen: Int): Int = xLen max fLen
+  def eLen: Int = 64
   def vMemDataBits: Int = 0
 }
 
@@ -93,7 +93,7 @@ trait HasCoreParameters extends HasTileParameters {
 
   def vLen = coreParams.vLen
   def sLen = coreParams.sLen
-  def eLen = coreParams.eLen(xLen, fLen)
+  def eLen = coreParams.eLen
   def vMemDataBits = if (usingVector) coreParams.vMemDataBits else 0
   def maxVLMax = vLen
 
