@@ -7,15 +7,18 @@ import Chisel._
 import freechips.rocketchip.util._
 import freechips.rocketchip.util.property._
 
-class EventSet(gate: (UInt, UInt) => Bool, events: Seq[(String, () => Bool)]) {
+class EventSet(val gate: (UInt, UInt) => Bool, val events: Seq[(String, () => Bool)]) {
   def size = events.size
-  def hits = events.map(_._2()).asUInt
-  def check(mask: UInt) = gate(mask, hits)
-  def dump() {
+  val hits = Wire(Vec(size, Bool()))
+  def check(mask: UInt) = {
+    hits := events.map(_._2())
+    gate(mask, hits.asUInt)
+  }
+  def dump(): Unit = {
     for (((name, _), i) <- events.zipWithIndex)
       when (check(1.U << i)) { printf(s"Event $name\n") }
   }
-  def withCovers {
+  def withCovers: Unit = {
     events.zipWithIndex.foreach {
       case ((name, func), i) => cover(gate((1.U << i), (func() << i)), name)
     }
@@ -25,14 +28,15 @@ class EventSet(gate: (UInt, UInt) => Bool, events: Seq[(String, () => Bool)]) {
 class EventSets(val eventSets: Seq[EventSet]) {
   def maskEventSelector(eventSel: UInt): UInt = {
     // allow full associativity between counters and event sets (for now?)
-    val setMask = (BigInt(1) << log2Ceil(eventSets.size)) - 1
-    val maskMask = ((BigInt(1) << eventSets.map(_.size).max) - 1) << eventSetIdBits
+    val setMask = (BigInt(1) << eventSetIdBits) - 1
+    val maskMask = ((BigInt(1) << eventSets.map(_.size).max) - 1) << maxEventSetIdBits
     eventSel & (setMask | maskMask).U
   }
 
   private def decode(counter: UInt): (UInt, UInt) = {
-    require(eventSets.size <= (1 << eventSetIdBits))
-    (counter(log2Ceil(eventSets.size)-1, 0), counter >> eventSetIdBits)
+    require(eventSets.size <= (1 << maxEventSetIdBits))
+    require(eventSetIdBits > 0)
+    (counter(eventSetIdBits-1, 0), counter >> maxEventSetIdBits)
   }
 
   def evaluate(eventSel: UInt): Bool = {
@@ -46,23 +50,31 @@ class EventSets(val eventSets: Seq[EventSet]) {
 
   def cover() = eventSets.foreach { _ withCovers }
 
-  private def eventSetIdBits = 8
+  private def eventSetIdBits = log2Ceil(eventSets.size)
+  private def maxEventSetIdBits = 8
+
+  require(eventSetIdBits <= maxEventSetIdBits)
 }
 
-class SuperscalarEventSets(eventSets: Seq[(Seq[EventSet], (UInt, UInt) => UInt)]) {
+class SuperscalarEventSets(val eventSets: Seq[(Seq[EventSet], (UInt, UInt) => UInt)]) {
   def evaluate(eventSel: UInt): UInt = {
     val (set, mask) = decode(eventSel)
-    val sets = for ((sets, reducer) <- eventSets)
-      yield sets.map(_.check(mask)).reduce(reducer)
+    val sets = for ((sets, reducer) <- eventSets) yield {
+      sets.map { set =>
+        require(set.hits.getWidth <= mask.getWidth, s"too many events ${set.hits.getWidth} wider than mask ${mask.getWidth}")
+        set.check(mask)
+      }.reduce(reducer)
+    }
     val zeroPadded = sets.padTo(1 << eventSetIdBits, 0.U)
     zeroPadded(set)
   }
 
   def toScalarEventSets: EventSets = new EventSets(eventSets.map(_._1.head))
 
-  def cover() { eventSets.foreach(_._1.foreach(_.withCovers)) }
+  def cover(): Unit = { eventSets.foreach(_._1.foreach(_.withCovers)) }
 
   private def decode(counter: UInt): (UInt, UInt) = {
+    require(eventSets.size <= (1 << maxEventSetIdBits))
     require(eventSetIdBits > 0)
     (counter(eventSetIdBits-1, 0), counter >> maxEventSetIdBits)
   }

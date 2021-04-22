@@ -5,9 +5,8 @@ package freechips.rocketchip.diplomaticobjectmodel
 import java.io.{File, FileWriter}
 
 import Chisel.{Data, Vec, log2Ceil}
-import freechips.rocketchip.diplomacy.{ AddressSet, Binding, Device, DiplomacyUtils, ResourceAddress, ResourceBindings, ResourceBindingsMap, ResourceInt, ResourceMapping, ResourcePermissions, ResourceValue, SimpleDevice}
+import freechips.rocketchip.diplomacy.{ AddressSet, Binding, Device, DiplomacyUtils, ResourceAddress, ResourceBindings, ResourceInt, ResourceMapping, ResourcePermissions, ResourceValue, SimpleDevice}
 import freechips.rocketchip.diplomaticobjectmodel.model._
-import freechips.rocketchip.util.Code
 import org.json4s.jackson.JsonMethods.pretty
 import org.json4s.jackson.Serialization
 import org.json4s.{CustomSerializer, Extraction, NoTypeHints}
@@ -122,7 +121,9 @@ object DiplomaticObjectModelAddressing {
     }
   }
 
-  private def omMemoryRegion(name: String, description: String, value: ResourceValue, omRegMap: Option[OMRegisterMap]): OMMemoryRegion = {
+  private def omMemoryRegion(name: String, description: String, value: ResourceValue,
+    omRegMap: Option[OMRegisterMap],
+    omAddressBlocks: Seq[OMAddressBlock] = Nil): OMMemoryRegion = {
     val (omRanges, permissions) = value match {
       case rm: ResourceMapping =>
         (omAddressSets(rm.address, name),rm.permissions)
@@ -135,7 +136,8 @@ object DiplomaticObjectModelAddressing {
       description = description,
       addressSets = omRanges,
       permissions = omPerms(permissions),
-      registerMap = omRegMap
+      registerMap = omRegMap,
+      addressBlocks = (omAddressBlocks ++ omRegMap.map{_.addressBlocks}.getOrElse(Nil)).distinct
     )
   }
 
@@ -143,13 +145,18 @@ object DiplomaticObjectModelAddressing {
     Nil
   }
 
-  def getOMMemoryRegions(name: String, resourceBindings: ResourceBindings, omRegMap: Option[OMRegisterMap] = None): Seq[OMMemoryRegion]= {
-    resourceBindings.map.collect {
+  def getOMMemoryRegions(name: String, resourceBindings: ResourceBindings, omRegMap: Option[OMRegisterMap] = None,
+    omAddressBlocks: Seq[OMAddressBlock] = Nil): Seq[OMMemoryRegion] = {
+    val result =  resourceBindings.map.collect {
       case (x: String, seq: Seq[Binding]) if (DiplomacyUtils.regFilter(x) || DiplomacyUtils.rangeFilter(x)) =>
         seq.map {
-          case Binding(device: Option[Device], value: ResourceValue) => omMemoryRegion(name, DiplomacyUtils.regName(x).getOrElse(""), value, omRegMap)
+          case Binding(device: Option[Device], value: ResourceValue) =>
+            omMemoryRegion(name, DiplomacyUtils.regName(x).getOrElse(""), value, omRegMap, omAddressBlocks)
         }
     }.flatten.toSeq
+    require(omRegMap.isEmpty || (result.size == 1),
+      s"If Register Map is specified, there must be exactly one Memory Region, not ${result.size}")
+    result
   }
 
   def getOMPortMemoryRegions(name: String, resourceBindings: ResourceBindings, omRegMap: Option[OMRegisterMap] = None): Seq[OMMemoryRegion]= {

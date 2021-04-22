@@ -37,8 +37,8 @@ abstract class TLBusWrapper(params: HasTLBusParams, val busName: String)(implici
     with CanAttachTLSlaves
     with CanAttachTLMasters
 {
-  private val clockGroupAggregator = LazyModule(new ClockGroupAggregator(busName)).suggestName(busName + "_clock_groups")
-  private val clockGroup = LazyModule(new ClockGroup(busName))
+  private val clockGroupAggregator = LazyModule(new ClockGroupAggregator(busName){ override def shouldBeInlined = true }).suggestName(busName + "_clock_groups")
+  private val clockGroup = LazyModule(new ClockGroup(busName){ override def shouldBeInlined = true })
   val clockGroupNode = clockGroupAggregator.node // other bus clock groups attach here
   val clockNode = clockGroup.node
   val fixedClockNode = FixedClockBroadcast(fixedClockOpt) // device clocks attach here
@@ -47,6 +47,13 @@ abstract class TLBusWrapper(params: HasTLBusParams, val busName: String)(implici
   clockGroup.node := clockGroupAggregator.node
   fixedClockNode := clockGroup.node // first member of group is always domain's own clock
   clockSinkNode := fixedClockNode
+
+  InModuleBody {
+    // make sure the above connections work properly because mismatched-by-name signals will just be ignored.
+    (clockGroup.node.edges.in zip clockGroupAggregator.node.edges.out).zipWithIndex map { case ((in: ClockGroupEdgeParameters , out: ClockGroupEdgeParameters), i) =>
+      require(in.members.keys == out.members.keys, s"clockGroup := clockGroupAggregator not working as you expect for index ${i}, becuase clockGroup has ${in.members.keys} and clockGroupAggregator has ${out.members.keys}")
+    }
+  }
 
   def clockBundle = clockSinkNode.in.head._1
   def beatBytes = params.beatBytes
@@ -62,24 +69,26 @@ abstract class TLBusWrapper(params: HasTLBusParams, val busName: String)(implici
   def inwardNode: TLInwardNode
   def outwardNode: TLOutwardNode
   def busView: TLEdge
-  val prefixNode: Option[BundleBridgeSink[UInt]]
+  def prefixNode: Option[BundleBridgeNode[UInt]]
   def unifyManagers: List[TLManagerParameters] = ManagerUnification(busView.manager.managers)
   def crossOutHelper = this.crossOut(outwardNode)(ValName("bus_xing"))
   def crossInHelper = this.crossIn(inwardNode)(ValName("bus_xing"))
 
+  protected val addressPrefixNexusNode = BundleBroadcast[UInt](registered = false, default = Some(() => 0.U(1.W)))
+
   def to[T](name: String)(body: => T): T = {
-    this { LazyScope(s"coupler_to_${name}") { body } }
+    this { LazyScope(s"coupler_to_${name}", "TLInterconnectCoupler") { body } }
   }
 
   def from[T](name: String)(body: => T): T = {
-    this { LazyScope(s"coupler_from_${name}") { body } }
+    this { LazyScope(s"coupler_from_${name}", "TLInterconnectCoupler") { body } }
   }
 
   def coupleTo[T](name: String)(gen: TLOutwardNode => T): T =
-    to(name) { gen(outwardNode) }
+    to(name) { gen(TLNameNode("tl") :*=* outwardNode) }
 
   def coupleFrom[T](name: String)(gen: TLInwardNode => T): T =
-    from(name) { gen(inwardNode) }
+    from(name) { gen(inwardNode :*=* TLNameNode("tl")) }
 
   def crossToBus(bus: TLBusWrapper, xType: ClockCrossingType)(implicit asyncClockGroupNode: ClockGroupEphemeralNode): NoHandle = {
     bus.clockGroupNode := asyncMux(xType, asyncClockGroupNode, this.clockGroupNode)
@@ -233,11 +242,11 @@ trait CanAttachTLSlaves extends HasTLBusParams { this: TLBusWrapper =>
     to("slave" named name) { gen :*= TLBuffer(buffer) :*= outwardNode }
   }
 
-  def toVariableWidthSlaveNode(name: Option[String] = None, buffer: BufferParams = BufferParams.none)(node: TLInwardNode) {
+  def toVariableWidthSlaveNode(name: Option[String] = None, buffer: BufferParams = BufferParams.none)(node: TLInwardNode): Unit = {
     toVariableWidthSlaveNodeOption(name, buffer)(Some(node))
   }
 
-  def toVariableWidthSlaveNodeOption(name: Option[String] = None, buffer: BufferParams = BufferParams.none)(node: Option[TLInwardNode]) {
+  def toVariableWidthSlaveNodeOption(name: Option[String] = None, buffer: BufferParams = BufferParams.none)(node: Option[TLInwardNode]): Unit = {
     node foreach { n => to("slave" named name) {
       n :*= TLFragmenter(beatBytes, blockBytes) :*= TLBuffer(buffer) :*= outwardNode
     }}
@@ -252,7 +261,7 @@ trait CanAttachTLSlaves extends HasTLBusParams { this: TLBusWrapper =>
     }
   }
 
-  def toFixedWidthSlaveNode(name: Option[String] = None, buffer: BufferParams = BufferParams.none)(gen: TLInwardNode) {
+  def toFixedWidthSlaveNode(name: Option[String] = None, buffer: BufferParams = BufferParams.none)(gen: TLInwardNode): Unit = {
     to("slave" named name) { gen :*= TLWidthWidget(beatBytes) :*= TLBuffer(buffer) :*= outwardNode }
   }
 
@@ -265,7 +274,7 @@ trait CanAttachTLSlaves extends HasTLBusParams { this: TLBusWrapper =>
 
   def toFixedWidthSingleBeatSlaveNode
       (widthBytes: Int, name: Option[String] = None, buffer: BufferParams = BufferParams.none)
-      (gen: TLInwardNode) {
+      (gen: TLInwardNode): Unit = {
     to("slave" named name) {
       gen :*= TLFragmenter(widthBytes, blockBytes) :*= TLWidthWidget(beatBytes) :*= TLBuffer(buffer) :*= outwardNode
     }
@@ -310,7 +319,7 @@ trait CanAttachTLMasters extends HasTLBusParams { this: TLBusWrapper =>
 
   def fromMasterNode
       (name: Option[String] = None, buffer: BufferParams = BufferParams.none)
-      (gen: TLOutwardNode) {
+      (gen: TLOutwardNode): Unit = {
     from("master" named name) {
       inwardNode :=* TLBuffer(buffer) :=* TLFIFOFixer(TLFIFOFixer.all) :=* gen
     }
@@ -347,6 +356,7 @@ trait CanAttachTLMasters extends HasTLBusParams { this: TLBusWrapper =>
 trait HasTLXbarPhy { this: TLBusWrapper =>
   private val xbar = LazyModule(new TLXbar).suggestName(busName + "_xbar")
 
+  override def shouldBeInlined = xbar.node.circuitIdentity
   def inwardNode: TLInwardNode = xbar.node
   def outwardNode: TLOutwardNode = xbar.node
   def busView: TLEdge = xbar.node.edges.in.head
@@ -357,7 +367,9 @@ case class AddressAdjusterWrapperParams(
   beatBytes: Int,
   replication: Option[ReplicatedRegion],
   forceLocal: Seq[AddressSet] = Nil,
-  policy: TLFIFOFixer.Policy = TLFIFOFixer.allVolatile
+  localBaseAddressDefault: Option[BigInt] = None,
+  policy: TLFIFOFixer.Policy = TLFIFOFixer.allVolatile,
+  ordered: Boolean = true
 )
   extends HasTLBusParams
   with TLBusWrapperInstantiationLike
@@ -372,13 +384,17 @@ case class AddressAdjusterWrapperParams(
 }
 
 class AddressAdjusterWrapper(params: AddressAdjusterWrapperParams, name: String)(implicit p: Parameters) extends TLBusWrapper(params, name) {
-  private val address_adjuster = params.replication.map { r => LazyModule(new AddressAdjuster(r, params.forceLocal)) }
+  private val address_adjuster = params.replication.map { r => LazyModule(new AddressAdjuster(r, params.forceLocal, params.localBaseAddressDefault, params.ordered)) }
   private val viewNode = TLIdentityNode()
   val inwardNode: TLInwardNode = address_adjuster.map(_.node :*=* TLFIFOFixer(params.policy) :*=* viewNode).getOrElse(viewNode)
   def outwardNode: TLOutwardNode = address_adjuster.map(_.node).getOrElse(viewNode)
   def busView: TLEdge = viewNode.edges.in.head
-  val prefixNode = address_adjuster.map(_.prefix)
+  val prefixNode = address_adjuster.map { a =>
+    a.prefix := addressPrefixNexusNode
+    addressPrefixNexusNode
+  }
   val builtInDevices = BuiltInDevices.none
+  override def shouldBeInlined = !params.replication.isDefined
 }
 
 case class TLJBarWrapperParams(
@@ -404,4 +420,5 @@ class TLJBarWrapper(params: TLJBarWrapperParams, name: String)(implicit p: Param
   def busView: TLEdge = jbar.node.edges.in.head
   val prefixNode = None
   val builtInDevices = BuiltInDevices.none
+  override def shouldBeInlined = jbar.node.circuitIdentity
 }

@@ -2,7 +2,6 @@
 
 package freechips.rocketchip.diplomaticobjectmodel.logicaltree
 
-import freechips.rocketchip.diplomacy.BindingScope.bindingScopes
 import freechips.rocketchip.diplomacy.{BindingScope, Device, ResourceBindings, ResourceBindingsMap, SimpleDevice}
 import freechips.rocketchip.diplomaticobjectmodel.model.OMComponent
 
@@ -36,7 +35,7 @@ object LogicalModuleTree {
 
   def rootLogicalTreeNode: LogicalTreeNode = {
     val roots = tree.collect { case (k, _) if !tree.exists(_._2.contains(k)) => k }
-    assert(roots.size == 1, "Logical Tree contains more than one root.")
+    require(roots.size == 1, s"Logical Tree contains more than one root:\n$roots")
     roots.head
   }
 

@@ -7,7 +7,6 @@ import chisel3.internal.sourceinfo.SourceInfo
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.util.{AsyncQueueParams,RationalDirection}
-import scala.collection.mutable.ListBuffer
 
 case object TLMonitorBuilder extends Field[TLMonitorArgs => TLMonitorBase](args => new TLMonitor(args))
 
@@ -21,7 +20,7 @@ object TLImp extends NodeImp[TLMasterPortParameters, TLSlavePortParameters, TLEd
 
   def render(ei: TLEdgeIn) = RenderedEdge(colour = "#000000" /* black */, label = (ei.manager.beatBytes * 8).toString)
 
-  override def monitor(bundle: TLBundle, edge: TLEdgeIn) {
+  override def monitor(bundle: TLBundle, edge: TLEdgeIn): Unit = {
     val monitor = Module(edge.params(TLMonitorBuilder)(TLMonitorArgs(edge)))
     monitor.io.in := bundle
   }
@@ -32,16 +31,51 @@ object TLImp extends NodeImp[TLMasterPortParameters, TLSlavePortParameters, TLEd
     pu.v1copy(managers = pu.managers.map { m => m.v1copy (nodePath = node +: m.nodePath) })
 }
 
-trait TLFormatNode extends FormatNode[TLEdgeIn, TLEdgeOut] 
+object TLImp_ACancel extends NodeImp[TLMasterPortParameters, TLSlavePortParameters, TLEdgeOut, TLEdgeIn, TLBundle_ACancel]
+{
+  def edgeO(pd: TLMasterPortParameters, pu: TLSlavePortParameters, p: Parameters, sourceInfo: SourceInfo) = TLImp.edgeO(pd, pu, p, sourceInfo)
+  def edgeI(pd: TLMasterPortParameters, pu: TLSlavePortParameters, p: Parameters, sourceInfo: SourceInfo) = TLImp.edgeI(pd, pu, p, sourceInfo)
+
+  def bundleO(eo: TLEdgeOut) = TLBundle_ACancel(eo.bundle)
+  def bundleI(ei: TLEdgeIn)  = TLBundle_ACancel(ei.bundle)
+
+  def render(ei: TLEdgeIn) = TLImp.render(ei)
+
+  override def monitor(bundle: TLBundle_ACancel, edge: TLEdgeIn): Unit = {
+    val monitor = Module(edge.params(TLMonitorBuilder)(TLMonitorArgs(edge)))
+    monitor.io.in := bundle.monitorAndNotCancel()
+  }
+
+  override def mixO(pd: TLMasterPortParameters, node: OutwardNode[TLMasterPortParameters, TLSlavePortParameters, TLBundle_ACancel]): TLMasterPortParameters  =
+    pd.v1copy(clients  = pd.clients.map  { c => c.v1copy (nodePath = node +: c.nodePath) })
+  override def mixI(pu: TLSlavePortParameters, node: InwardNode[TLMasterPortParameters, TLSlavePortParameters, TLBundle_ACancel]): TLSlavePortParameters =
+    pu.v1copy(managers = pu.managers.map { m => m.v1copy (nodePath = node +: m.nodePath) })
+}
+
+trait TLFormatNode extends FormatNode[TLEdgeIn, TLEdgeOut]
 
 case class TLClientNode(portParams: Seq[TLMasterPortParameters])(implicit valName: ValName) extends SourceNode(TLImp)(portParams) with TLFormatNode
 case class TLManagerNode(portParams: Seq[TLSlavePortParameters])(implicit valName: ValName) extends SinkNode(TLImp)(portParams) with TLFormatNode
+
+case class TLClientNode_ACancel(portParams: Seq[TLMasterPortParameters])(implicit valName: ValName) extends SourceNode(TLImp_ACancel)(portParams) with TLFormatNode
 
 case class TLAdapterNode(
   clientFn:  TLMasterPortParameters => TLMasterPortParameters = { s => s },
   managerFn: TLSlavePortParameters  => TLSlavePortParameters  = { s => s })(
   implicit valName: ValName)
   extends AdapterNode(TLImp)(clientFn, managerFn) with TLFormatNode
+
+case class TLAdapterNodeAndNotCancel(
+  clientFn:  TLMasterPortParameters => TLMasterPortParameters = { s => s },
+  managerFn: TLSlavePortParameters  => TLSlavePortParameters  = { s => s })(
+  implicit valName: ValName)
+  extends MixedAdapterNode(TLImp_ACancel, TLImp)(clientFn, managerFn) with TLFormatNode
+
+case class TLAdapterNode_ACancel(
+  clientFn:  TLMasterPortParameters => TLMasterPortParameters = { s => s },
+  managerFn: TLSlavePortParameters  => TLSlavePortParameters  = { s => s })(
+  implicit valName: ValName)
+  extends AdapterNode(TLImp_ACancel)(clientFn, managerFn) with TLFormatNode
 
 case class TLJunctionNode(
   clientFn:     Seq[TLMasterPortParameters] => Seq[TLMasterPortParameters],
@@ -68,6 +102,12 @@ case class TLNexusNode(
   managerFn:       Seq[TLSlavePortParameters]  => TLSlavePortParameters)(
   implicit valName: ValName)
   extends NexusNode(TLImp)(clientFn, managerFn) with TLFormatNode
+
+case class TLNexusNode_ACancel(
+  clientFn:        Seq[TLMasterPortParameters] => TLMasterPortParameters,
+  managerFn:       Seq[TLSlavePortParameters]  => TLSlavePortParameters)(
+  implicit valName: ValName)
+  extends NexusNode(TLImp_ACancel)(clientFn, managerFn) with TLFormatNode
 
 abstract class TLCustomNode(implicit valName: ValName)
   extends CustomNode(TLImp) with TLFormatNode
@@ -149,3 +189,43 @@ case class TLRationalSinkNode(direction: RationalDirection)(implicit valName: Va
   extends MixedAdapterNode(TLRationalImp, TLImp)(
     dFn = { p => p.base.v1copy(minLatency = 1) },
     uFn = { p => TLRationalManagerPortParameters(direction, p) }) with FormatNode[TLRationalEdgeParameters, TLEdgeOut]
+
+// Credited version of TileLink channels
+
+trait TLCreditedFormatNode extends FormatNode[TLCreditedEdgeParameters, TLCreditedEdgeParameters]
+
+object TLCreditedImp extends SimpleNodeImp[TLCreditedClientPortParameters, TLCreditedManagerPortParameters, TLCreditedEdgeParameters, TLCreditedBundle]
+{
+  def edge(pd: TLCreditedClientPortParameters, pu: TLCreditedManagerPortParameters, p: Parameters, sourceInfo: SourceInfo) = TLCreditedEdgeParameters(pd, pu, p, sourceInfo)
+  def bundle(e: TLCreditedEdgeParameters) = new TLCreditedBundle(e.bundle)
+  def render(e: TLCreditedEdgeParameters) = RenderedEdge(colour = "#ffff00" /* yellow */, e.delay.toString)
+
+  override def mixO(pd: TLCreditedClientPortParameters, node: OutwardNode[TLCreditedClientPortParameters, TLCreditedManagerPortParameters, TLCreditedBundle]): TLCreditedClientPortParameters  =
+   pd.copy(base = pd.base.v1copy(clients  = pd.base.clients.map  { c => c.v1copy (nodePath = node +: c.nodePath) }))
+  override def mixI(pu: TLCreditedManagerPortParameters, node: InwardNode[TLCreditedClientPortParameters, TLCreditedManagerPortParameters, TLCreditedBundle]): TLCreditedManagerPortParameters =
+   pu.copy(base = pu.base.v1copy(managers = pu.base.managers.map { m => m.v1copy (nodePath = node +: m.nodePath) }))
+}
+
+case class TLCreditedAdapterNode(
+  clientFn:  TLCreditedClientPortParameters  => TLCreditedClientPortParameters  = { s => s },
+  managerFn: TLCreditedManagerPortParameters => TLCreditedManagerPortParameters = { s => s })(
+  implicit valName: ValName)
+  extends AdapterNode(TLCreditedImp)(clientFn, managerFn) with TLCreditedFormatNode
+
+case class TLCreditedIdentityNode()(implicit valName: ValName) extends IdentityNode(TLCreditedImp)() with TLCreditedFormatNode
+
+object TLCreditedNameNode {
+  def apply(name: ValName) = TLCreditedIdentityNode()(name)
+  def apply(name: Option[String]): TLCreditedIdentityNode = apply(ValName(name.getOrElse("with_no_name")))
+  def apply(name: String): TLCreditedIdentityNode = apply(Some(name))
+}
+
+case class TLCreditedSourceNode(delay: TLCreditedDelay)(implicit valName: ValName)
+  extends MixedAdapterNode(TLImp, TLCreditedImp)(
+    dFn = { p => TLCreditedClientPortParameters(delay, p) },
+    uFn = { p => p.base.v1copy(minLatency = 1) }) with FormatNode[TLEdgeIn, TLCreditedEdgeParameters] // discard cycles from other clock domain
+
+case class TLCreditedSinkNode(delay: TLCreditedDelay)(implicit valName: ValName)
+  extends MixedAdapterNode(TLCreditedImp, TLImp)(
+    dFn = { p => p.base.v1copy(minLatency = 1) },
+    uFn = { p => TLCreditedManagerPortParameters(delay, p) }) with FormatNode[TLCreditedEdgeParameters, TLEdgeOut]

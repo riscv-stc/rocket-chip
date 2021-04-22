@@ -5,14 +5,13 @@ package freechips.rocketchip.subsystem
 import Chisel._
 import freechips.rocketchip.config.{Field, Parameters}
 import freechips.rocketchip.diplomacy._
-import freechips.rocketchip.diplomaticobjectmodel.HasLogicalTreeNode
 import freechips.rocketchip.diplomaticobjectmodel.logicaltree._
 import freechips.rocketchip.prci._
 import freechips.rocketchip.tilelink.TLBusWrapper
 import freechips.rocketchip.util._
 
 case object SubsystemDriveAsyncClockGroupsKey extends Field[Option[ClockGroupDriverParameters]](Some(ClockGroupDriverParameters(1)))
-case object AsyncClockGroupsKey extends Field[ClockGroupEphemeralNode](ClockGroupEphemeralNode()(ValName("async_clock_groups")))
+case object AsyncClockGroupsKey extends Field[ClockGroupEphemeralNode](ClockGroupEphemeralNode()(ValName("clock_sources")))
 case class TLNetworkTopologyLocated(where: HierarchicalLocation) extends Field[Seq[CanInstantiateWithinContextThatHasTileLinkLocations with CanConnectWithinContextThatHasTileLinkLocations]]
 case class TLManagerViewpointLocated(where: HierarchicalLocation) extends Field[Location[TLBusWrapper]](SBUS)
 
@@ -48,12 +47,12 @@ case object SubsystemResetSchemeKey extends Field[SubsystemResetScheme](ResetSyn
   * These aren't actually very configurable, yet.
   */
 trait HasConfigurablePRCILocations { this: HasPRCILocations =>
-  val ibus = new InterruptBusWrapper()
+  val ibus = LazyModule(new InterruptBusWrapper)
   implicit val asyncClockGroupsNode = p(AsyncClockGroupsKey)
-  val async_clock_groups =
+  val clock_sources: ModuleValue[RecordMap[ClockBundle]] =
     p(SubsystemDriveAsyncClockGroupsKey)
       .map(_.drive(asyncClockGroupsNode))
-      .getOrElse(InModuleBody { HeterogeneousBag[ClockGroupBundle](Nil) })
+      .getOrElse(InModuleBody { RecordMap[ClockBundle]() })
 }
 
 /** Look up the topology configuration for the TL buses located within this layer of the hierarchy */
@@ -82,6 +81,10 @@ abstract class BaseSubsystem(val location: HierarchicalLocation = InSubsystem)
   // TODO must there really always be an "sbus"?
   val sbus = tlBusWrapperLocationMap(SBUS)
   tlBusWrapperLocationMap.lift(SBUS).map { _.clockGroupNode := asyncClockGroupsNode }
+
+  // TODO: Preserve legacy implicit-clock behavior for IBUS for now. If binding
+  // a PLIC to the CBUS, ensure it is synchronously coupled to the SBUS.
+  ibus.clockNode := sbus.fixedClockNode
 
   // TODO deprecate these public members to see where users are manually hardcoding a particular bus that might actually not exist in a certain dynamic topology
   val pbus = tlBusWrapperLocationMap.lift(PBUS).getOrElse(sbus)

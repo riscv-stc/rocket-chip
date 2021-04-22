@@ -4,12 +4,9 @@ package freechips.rocketchip.devices.debug
 
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.chiselName
-
 
 import freechips.rocketchip.config._
 import freechips.rocketchip.jtag._
-import freechips.rocketchip.util._
 import freechips.rocketchip.util.property._
 
 
@@ -75,7 +72,6 @@ class SystemJTAGIO extends Bundle {
 }
 
 // Use the Chisel Name macro due to the bulk of this being inside a withClockAndReset block
-@chiselName
 class DebugTransportModuleJTAG(debugAddrBits: Int, c: JtagDTMConfig)
   (implicit val p: Parameters) extends RawModule  {
 
