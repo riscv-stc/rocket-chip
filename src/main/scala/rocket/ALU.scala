@@ -26,15 +26,21 @@ object ALU
   def FN_SLTU = UInt(14)
   def FN_SGEU = UInt(15)
 
-  def FN_DIV  = FN_XOR
-  def FN_DIVU = FN_SR
-  def FN_REM  = FN_OR
-  def FN_REMU = FN_AND
+  def FN_DIV  = UInt(4)
+  def FN_DIVU = UInt(5)
+  def FN_REM  = UInt(6)
+  def FN_REMU = UInt(7)
 
-  def FN_MUL    = FN_ADD
-  def FN_MULH   = FN_SL
-  def FN_MULHSU = FN_SEQ
-  def FN_MULHU  = FN_SNE
+  def FN_MUL    = UInt(0)
+  def FN_MULH   = UInt(1)
+  def FN_MULHSU = UInt(2)
+  def FN_MULHU  = UInt(3)
+  def FN_MULU   = UInt(4) // For vector
+  def FN_MULSU  = UInt(5) // For vector
+  def FN_MACC   = UInt(6) // For vector
+  def FN_MACCU  = UInt(7) // For vector
+  def FN_MACCSU = UInt(8) // For vector
+  def FN_MACCUS = UInt(9) // For vector
 
   def isMulFN(fn: UInt, cmp: UInt) = fn(1,0) === cmp(1,0)
   def isSub(cmd: UInt) = cmd(3)
