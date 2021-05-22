@@ -22,7 +22,7 @@ trait CoreParams {
   val useAtomicsOnlyForIO: Boolean
   val useCompressed: Boolean
   val useBitManip: Boolean = false
-  val useVector: Boolean = false
+  val useVector: Boolean
   val useSCIE: Boolean
   val useRVE: Boolean
   val mulDiv: Option[MulDivParams]
