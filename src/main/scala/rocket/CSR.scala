@@ -291,13 +291,15 @@ class VType(implicit p: Parameters) extends CoreBundle {
 
   def minVLMax: Int = ((maxVLMax / eLen) >> ((1 << vlmul_mag.getWidth) - 1)) max 1
 
-  def vlMax: UInt = (maxVLMax >> (this.vsew +& Cat(this.vlmul_sign, ~this.vlmul_mag))).andNot(minVLMax-1)
+  def minVLMax = maxVLMax / eLen
+  def vlMax: UInt = (maxVLMax >> (this.vsew + 3.U - this.vlmul_signed)).andNot(minVLMax-1)
+  def vlMaxInBytes: UInt = maxVLMax >> ~this.vlmul
 
   def vl(avl: UInt, currentVL: UInt, useCurrentVL: Bool, useMax: Bool, useZero: Bool): UInt = {
     val atLeastMaxVLMax = useMax || Mux(useCurrentVL, currentVL >= maxVLMax, avl >= maxVLMax)
     val avl_lsbs = Mux(useCurrentVL, currentVL, avl)(maxVLMax.log2 - 1, 0)
 
-    val atLeastVLMax = atLeastMaxVLMax || (avl_lsbs & (-maxVLMax.S >> (this.vsew +& Cat(this.vlmul_sign, ~this.vlmul_mag))).asUInt.andNot(minVLMax-1)).orR
+    val atLeastVLMax = atLeastMaxVLMax || (avl_lsbs & (-maxVLMax.S >> (this.vsew + 3.U - this.vlmul_signed)).asUInt.andNot(minVLMax-1)).orR
     val isZero = vill || useZero
     Mux(!isZero && atLeastVLMax, vlMax, 0.U) | Mux(!isZero && !atLeastVLMax, avl_lsbs, 0.U)
   }
