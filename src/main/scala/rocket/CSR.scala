@@ -236,30 +236,6 @@ class CSRFileIO(implicit p: Parameters) extends CoreBundle
   val mcontext = Output(UInt(coreParams.mcontextWidth.W))
   val scontext = Output(UInt(coreParams.scontextWidth.W))
 
-  val instrs_dispatched = UInt(INPUT, log2Up(1+decodeWidth))
-  val fetch_bubbles = UInt(INPUT, log2Up(1+decodeWidth))
-  val fetch_latency = UInt(INPUT, log2Up(1+decodeWidth))
-  val recovery_bubbles = UInt(INPUT, log2Up(1+decodeWidth))
-  val icache_miss = UInt(INPUT, log2Up(1+decodeWidth))
-  val itlb_miss = UInt(INPUT, log2Up(1+decodeWidth))
-  val br_mispred_retired = UInt(INPUT, log2Up(1+decodeWidth))
-  val br_resteers = UInt(INPUT, log2Up(1+decodeWidth))
-  val machine_clears = UInt(INPUT, log2Up(1+decodeWidth))
-  val div_busy = UInt(INPUT, log2Up(1+decodeWidth))
-  val fp_retired = UInt(INPUT, log2Up(1+decodeWidth))
-  val exe_stall = UInt(INPUT, log2Up(1+decodeWidth))
-  val exe_port_all = UInt(INPUT, log2Up(1+decodeWidth))
-  val exe_port0 = UInt(INPUT, log2Up(1+decodeWidth))
-  val exe_port1 = UInt(INPUT, log2Up(1+decodeWidth))
-  val exe_port2 = UInt(INPUT, log2Up(1+decodeWidth))
-  val exe_port3 = UInt(INPUT, log2Up(1+decodeWidth))
-  val exe_port4 = UInt(INPUT, log2Up(1+decodeWidth))
-  val memstall_anyload = UInt(INPUT, log2Up(1+decodeWidth))
-  val memstall_l1miss = UInt(INPUT, log2Up(1+decodeWidth))
-  val memstall_l2miss = UInt(INPUT, log2Up(1+decodeWidth))
-  val memstall_stores = UInt(INPUT, log2Up(1+decodeWidth))
-  val extmem_outstanding = UInt(INPUT, log2Up(1+decodeWidth))
-
   val vector = usingVector.option(new Bundle {
     val vconfig = new VConfig().asOutput
     val vstart = UInt(maxVLMax.log2.W).asOutput
@@ -468,31 +444,6 @@ class CSRFile(
   val reg_hpmcounter = io.counters.zipWithIndex.map { case (c, i) =>
     WideCounter(CSR.hpmWidth, c.inc, reset = false, inhibit = reg_mcountinhibit(CSR.firstHPM+i)) }
 
-  //TMA
-  val reg_instrs_dispatched = WideCounter(64, io.instrs_dispatched)
-  val reg_fetch_bubbles = WideCounter(64, io.fetch_bubbles)
-  val reg_fetch_latency = WideCounter(64, io.fetch_latency)
-  val reg_recovery_bubbles = WideCounter(64, io.recovery_bubbles)
-  val reg_icache_miss = WideCounter(64, io.icache_miss)
-  val reg_itlb_miss = WideCounter(64, io.itlb_miss)
-  val reg_br_mispred_retired = WideCounter(64, io.br_mispred_retired)
-  val reg_br_resteers = WideCounter(64, io.br_resteers)
-  val reg_machine_clears = WideCounter(64, io.machine_clears)
-  val reg_divider = WideCounter(64, io.div_busy)
-  val reg_fp_retired = WideCounter(64, io.fp_retired)
-  val reg_exe_stall = WideCounter(64, io.exe_stall)
-  val reg_exe_port_all = WideCounter(64, io.exe_port_all)
-  val reg_exe_port0 = WideCounter(64, io.exe_port0)
-  val reg_exe_port1 = WideCounter(64, io.exe_port1)
-  val reg_exe_port2 = WideCounter(64, io.exe_port2)
-  val reg_exe_port3 = WideCounter(64, io.exe_port3)
-  val reg_exe_port4 = WideCounter(64, io.exe_port4)
-  val reg_memstall_anyload = WideCounter(64, io.memstall_anyload)
-  val reg_memstall_l1miss = WideCounter(64, io.memstall_l1miss)
-  val reg_memstall_l2miss = WideCounter(64, io.memstall_l2miss)
-  val reg_memstall_stores = WideCounter(64, io.memstall_stores)
-  val reg_extmem_outstanding = WideCounter(64, io.extmem_outstanding)
-
   val mip = Wire(init=reg_mip)
   mip.lip := (io.interrupts.lip: Seq[Bool])
   mip.mtip := io.interrupts.mtip
@@ -603,30 +554,6 @@ class CSRFile(
     read_mapping += CSRs.mcycle -> reg_cycle
     read_mapping += CSRs.minstret -> reg_instret
 
-    read_mapping += CSRs.mdisinstrs -> reg_instrs_dispatched
-    read_mapping += CSRs.mfetchbubbles -> reg_fetch_bubbles
-    read_mapping += CSRs.mfetchlatency -> reg_fetch_latency
-    read_mapping += CSRs.mrecybubbles -> reg_recovery_bubbles
-    read_mapping += CSRs.micachemiss -> reg_icache_miss
-    read_mapping += CSRs.mitlbmiss -> reg_itlb_miss
-    read_mapping += CSRs.mmispredinstret -> reg_br_mispred_retired
-    read_mapping += CSRs.mbrresteers -> reg_br_resteers
-    read_mapping += CSRs.mmachineclears -> reg_machine_clears
-    read_mapping += CSRs.mdivider -> reg_divider
-    read_mapping += CSRs.mfpret -> reg_fp_retired
-    read_mapping += CSRs.mexestall -> reg_exe_stall
-    read_mapping += CSRs.mexeportall -> reg_exe_port_all
-    read_mapping += CSRs.mexeport0 -> reg_exe_port0
-    read_mapping += CSRs.mexeport1 -> reg_exe_port1
-    read_mapping += CSRs.mexeport2 -> reg_exe_port2
-    read_mapping += CSRs.mexeport3 -> reg_exe_port3
-    read_mapping += CSRs.mexeport4 -> reg_exe_port4
-    read_mapping += CSRs.mldstall -> reg_memstall_anyload
-    read_mapping += CSRs.ml1miss -> reg_memstall_l1miss
-    read_mapping += CSRs.ml2miss -> reg_memstall_l2miss
-    read_mapping += CSRs.mstorestall -> reg_memstall_stores
-    read_mapping += CSRs.mextmemoutsd -> reg_extmem_outstanding
-
     for (((e, c), i) <- (reg_hpmevent.padTo(CSR.nHPM, UInt(0))
                          zip reg_hpmcounter.map(x => x: UInt).padTo(CSR.nHPM, UInt(0))) zipWithIndex) {
       read_mapping += (i + CSR.firstHPE) -> e // mhpmeventN
@@ -642,87 +569,14 @@ class CSRFile(
       read_mapping += CSRs.mcounteren -> read_mcounteren
       read_mapping += CSRs.cycle -> reg_cycle
       read_mapping += CSRs.instret -> reg_instret
-
-      read_mapping += CSRs.disinstrs -> reg_instrs_dispatched
-      read_mapping += CSRs.fetchbubbles -> reg_fetch_bubbles
-      read_mapping += CSRs.fetchlatency -> reg_fetch_latency
-      read_mapping += CSRs.recybubbles -> reg_recovery_bubbles
-      read_mapping += CSRs.icachemiss -> reg_icache_miss
-      read_mapping += CSRs.itlbmiss -> reg_itlb_miss
-      read_mapping += CSRs.mispredinstret -> reg_br_mispred_retired
-      read_mapping += CSRs.brresteers -> reg_br_resteers
-      read_mapping += CSRs.machineclears -> reg_machine_clears
-      read_mapping += CSRs.divider -> reg_divider
-      read_mapping += CSRs.fpret -> reg_fp_retired
-      read_mapping += CSRs.exestall -> reg_exe_stall
-      read_mapping += CSRs.exeportall -> reg_exe_port_all
-      read_mapping += CSRs.exeport0 -> reg_exe_port0
-      read_mapping += CSRs.exeport1 -> reg_exe_port1
-      read_mapping += CSRs.exeport2 -> reg_exe_port2
-      read_mapping += CSRs.exeport3 -> reg_exe_port3
-      read_mapping += CSRs.exeport4 -> reg_exe_port4
-      read_mapping += CSRs.ldstall -> reg_memstall_anyload
-      read_mapping += CSRs.l1miss -> reg_memstall_l1miss
-      read_mapping += CSRs.l2miss -> reg_memstall_l2miss
-      read_mapping += CSRs.storestall -> reg_memstall_stores
-      read_mapping += CSRs.extmemoutsd -> reg_extmem_outstanding
     }
 
     if (xLen == 32) {
       read_mapping += CSRs.mcycleh -> (reg_cycle >> 32)
       read_mapping += CSRs.minstreth -> (reg_instret >> 32)
-
-      read_mapping += CSRs.mdisinstrsh -> (reg_instrs_dispatched >> 32)
-      read_mapping += CSRs.mfetchbubblesh -> (reg_fetch_bubbles >> 32)
-      read_mapping += CSRs.mfetchlatency -> (reg_fetch_latency >> 32)
-      read_mapping += CSRs.mrecybubblesh -> (reg_recovery_bubbles >> 32)
-      read_mapping += CSRs.micachemissh -> (reg_icache_miss >> 32)
-      read_mapping += CSRs.mitlbmissh -> (reg_itlb_miss >> 32)
-      read_mapping += CSRs.mmispredinstreth -> (reg_br_mispred_retired >> 32)
-      read_mapping += CSRs.mbrresteersh -> (reg_br_resteers >> 32)
-      read_mapping += CSRs.mmachineclearsh -> (reg_machine_clears >> 32)
-      read_mapping += CSRs.mdividerh -> (reg_divider >> 32)
-      read_mapping += CSRs.mfpreth -> (reg_fp_retired >> 32)
-      read_mapping += CSRs.mexestallh -> (reg_exe_stall >> 32)
-      read_mapping += CSRs.mexeportallh -> (reg_exe_port_all >> 32)
-      read_mapping += CSRs.mexeport0h -> (reg_exe_port0 >> 32)
-      read_mapping += CSRs.mexeport1h -> (reg_exe_port1 >> 32)
-      read_mapping += CSRs.mexeport2h -> (reg_exe_port2 >> 32)
-      read_mapping += CSRs.mexeport3h -> (reg_exe_port3 >> 32)
-      read_mapping += CSRs.mexeport4h -> (reg_exe_port4 >> 32)
-      read_mapping += CSRs.mldstallh -> (reg_memstall_anyload >> 32)
-      read_mapping += CSRs.ml1missh -> (reg_memstall_l1miss >> 32)
-      read_mapping += CSRs.ml2missh -> (reg_memstall_l2miss >> 32)
-      read_mapping += CSRs.mstorestallh -> (reg_memstall_stores >> 32)
-      read_mapping += CSRs.mextmemoutsdh -> (reg_extmem_outstanding >> 32)
-
       if (usingUser) {
         read_mapping += CSRs.cycleh -> (reg_cycle >> 32)
         read_mapping += CSRs.instreth -> (reg_instret >> 32)
-
-        read_mapping += CSRs.disinstrsh -> (reg_instrs_dispatched >> 32)
-        read_mapping += CSRs.fetchbubblesh -> (reg_fetch_bubbles >> 32)
-        read_mapping += CSRs.fetchlatency -> (reg_fetch_latency >> 32)
-        read_mapping += CSRs.recybubblesh -> (reg_recovery_bubbles >> 32)
-        read_mapping += CSRs.icachemissh -> (reg_icache_miss >> 32)
-        read_mapping += CSRs.itlbmissh -> (reg_itlb_miss >> 32)
-        read_mapping += CSRs.mispredinstreth -> (reg_br_mispred_retired >> 32)
-        read_mapping += CSRs.brresteersh -> (reg_br_resteers >> 32)
-        read_mapping += CSRs.machineclearsh -> (reg_machine_clears >> 32)
-        read_mapping += CSRs.dividerh -> (reg_divider >> 32)
-        read_mapping += CSRs.fpreth -> (reg_fp_retired >> 32)
-        read_mapping += CSRs.exestallh -> (reg_exe_stall >> 32)
-        read_mapping += CSRs.exeportallh -> (reg_exe_port_all >> 32)
-        read_mapping += CSRs.exeport0h -> (reg_exe_port0 >> 32)
-        read_mapping += CSRs.exeport1h -> (reg_exe_port1 >> 32)
-        read_mapping += CSRs.exeport2h -> (reg_exe_port2 >> 32)
-        read_mapping += CSRs.exeport3h -> (reg_exe_port3 >> 32)
-        read_mapping += CSRs.exeport4h -> (reg_exe_port4 >> 32)
-        read_mapping += CSRs.ldstallh -> (reg_memstall_anyload >> 32)
-        read_mapping += CSRs.l1missh -> (reg_memstall_l1miss >> 32)
-        read_mapping += CSRs.l2missh -> (reg_memstall_l2miss >> 32)
-        read_mapping += CSRs.storestallh -> (reg_memstall_stores >> 32)
-        read_mapping += CSRs.extmemoutsdh -> (reg_extmem_outstanding >> 32)
       }
     }
   }
@@ -1112,30 +966,6 @@ class CSRFile(
       when (decoded_addr(CSRs.mcountinhibit)) { reg_mcountinhibit := wdata & ~2.U(xLen.W) }  // mcountinhibit bit [1] is tied zero
       writeCounter(CSRs.mcycle, reg_cycle, wdata)
       writeCounter(CSRs.minstret, reg_instret, wdata)
-
-      writeCounter(CSRs.mdisinstrs, reg_instrs_dispatched, wdata)
-      writeCounter(CSRs.mfetchbubbles, reg_fetch_bubbles, wdata)
-      writeCounter(CSRs.mfetchlatency, reg_fetch_latency, wdata)
-      writeCounter(CSRs.mrecybubbles, reg_recovery_bubbles, wdata)
-      writeCounter(CSRs.micachemiss, reg_icache_miss, wdata)
-      writeCounter(CSRs.mitlbmiss, reg_itlb_miss, wdata)
-      writeCounter(CSRs.mmispredinstret, reg_br_mispred_retired, wdata)
-      writeCounter(CSRs.mbrresteers, reg_br_resteers, wdata)
-      writeCounter(CSRs.mmachineclears, reg_machine_clears, wdata)
-      writeCounter(CSRs.mdivider, reg_divider, wdata)
-      writeCounter(CSRs.mfpret, reg_fp_retired, wdata)
-      writeCounter(CSRs.mexestall, reg_exe_stall, wdata)
-      writeCounter(CSRs.mexeportall, reg_exe_port_all, wdata)
-      writeCounter(CSRs.mexeport0, reg_exe_port0, wdata)
-      writeCounter(CSRs.mexeport1, reg_exe_port1, wdata)
-      writeCounter(CSRs.mexeport2, reg_exe_port2, wdata)
-      writeCounter(CSRs.mexeport3, reg_exe_port3, wdata)
-      writeCounter(CSRs.mexeport4, reg_exe_port4, wdata)
-      writeCounter(CSRs.mldstall, reg_memstall_anyload, wdata)
-      writeCounter(CSRs.ml1miss, reg_memstall_l1miss, wdata)
-      writeCounter(CSRs.ml2miss, reg_memstall_l2miss, wdata)
-      writeCounter(CSRs.mstorestall, reg_memstall_stores, wdata)
-      writeCounter(CSRs.mextmemoutsd, reg_extmem_outstanding, wdata)
     }
 
     if (usingFPU) {
