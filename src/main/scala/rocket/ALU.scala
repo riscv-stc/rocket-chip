@@ -52,7 +52,7 @@ object ALU
 
 import ALU._
 
-class ALU(implicit p: Parameters) extends CoreModule()(p) {
+class ALU(withCarryIO: Boolean = false)(implicit p: Parameters) extends CoreModule()(p) {
   val io = new Bundle {
     val dw = Bits(INPUT, SZ_DW)
     val fn = Bits(INPUT, SZ_ALU_FN)
@@ -61,12 +61,19 @@ class ALU(implicit p: Parameters) extends CoreModule()(p) {
     val out = UInt(OUTPUT, xLen)
     val adder_out = UInt(OUTPUT, xLen)
     val cmp_out = Bool(OUTPUT)
+    val ci = if (withCarryIO) Bool(INPUT) else null
+    val co = if (withCarryIO) Bool(OUTPUT) else null
   }
 
   // ADD, SUB
   val in2_inv = Mux(isSub(io.fn), ~io.in2, io.in2)
   val in1_xor_in2 = io.in1 ^ in2_inv
   io.adder_out := io.in1 + in2_inv + isSub(io.fn)
+  if (withCarryIO) {
+    val adder: UInt = io.in1 +& in2_inv + (isSub(io.fn) ^ io.ci)
+    io.adder_out := adder(xLen-1, 0)
+    io.co := adder(xLen)
+  }
 
   // SLT, SLTU
   val slt =
