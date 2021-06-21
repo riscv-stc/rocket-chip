@@ -11,36 +11,36 @@ object ALU
 {
   val SZ_ALU_FN = 4
   def FN_X    = BitPat("b????")
-  def FN_ADD  = UInt(0)
-  def FN_SL   = UInt(1)
-  def FN_SEQ  = UInt(2)
-  def FN_SNE  = UInt(3)
-  def FN_XOR  = UInt(4)
-  def FN_SR   = UInt(5)
-  def FN_OR   = UInt(6)
-  def FN_AND  = UInt(7)
-  def FN_SUB  = UInt(10)
-  def FN_SRA  = UInt(11)
-  def FN_SLT  = UInt(12)
-  def FN_SGE  = UInt(13)
-  def FN_SLTU = UInt(14)
-  def FN_SGEU = UInt(15)
+  def FN_ADD  = UInt(0, SZ_ALU_FN)
+  def FN_SL   = UInt(1, SZ_ALU_FN)
+  def FN_SEQ  = UInt(2, SZ_ALU_FN)
+  def FN_SNE  = UInt(3, SZ_ALU_FN)
+  def FN_XOR  = UInt(4, SZ_ALU_FN)
+  def FN_SR   = UInt(5, SZ_ALU_FN)
+  def FN_OR   = UInt(6, SZ_ALU_FN)
+  def FN_AND  = UInt(7, SZ_ALU_FN)
+  def FN_SUB  = UInt(10, SZ_ALU_FN)
+  def FN_SRA  = UInt(11, SZ_ALU_FN)
+  def FN_SLT  = UInt(12, SZ_ALU_FN)
+  def FN_SGE  = UInt(13, SZ_ALU_FN)
+  def FN_SLTU = UInt(14, SZ_ALU_FN)
+  def FN_SGEU = UInt(15, SZ_ALU_FN)
 
-  def FN_DIV  = UInt(4)
-  def FN_DIVU = UInt(5)
-  def FN_REM  = UInt(6)
-  def FN_REMU = UInt(7)
+  def FN_DIV  = UInt(4, SZ_ALU_FN)
+  def FN_DIVU = UInt(5, SZ_ALU_FN)
+  def FN_REM  = UInt(6, SZ_ALU_FN)
+  def FN_REMU = UInt(7, SZ_ALU_FN)
 
-  def FN_MUL    = UInt(0)
-  def FN_MULH   = UInt(1)
-  def FN_MULHSU = UInt(2)
-  def FN_MULHU  = UInt(3)
-  def FN_MULU   = UInt(4) // For vector
-  def FN_MULSU  = UInt(5) // For vector
-  def FN_MACC   = UInt(6) // For vector
-  def FN_MACCU  = UInt(7) // For vector
-  def FN_MACCSU = UInt(8) // For vector
-  def FN_MACCUS = UInt(9) // For vector
+  def FN_MUL    = UInt(0, SZ_ALU_FN)
+  def FN_MULH   = UInt(1, SZ_ALU_FN)
+  def FN_MULHSU = UInt(2, SZ_ALU_FN)
+  def FN_MULHU  = UInt(3, SZ_ALU_FN)
+  def FN_MULU   = UInt(4, SZ_ALU_FN) // For vector
+  def FN_MULSU  = UInt(5, SZ_ALU_FN) // For vector
+  def FN_MACC   = UInt(6, SZ_ALU_FN) // For vector
+  def FN_MACCU  = UInt(7, SZ_ALU_FN) // For vector
+  def FN_MACCSU = UInt(8, SZ_ALU_FN) // For vector
+  def FN_MACCUS = UInt(9, SZ_ALU_FN) // For vector
 
   def isMulFN(fn: UInt, cmp: UInt) = fn(1,0) === cmp(1,0)
   def isSub(cmd: UInt) = cmd(3)
