@@ -1113,13 +1113,13 @@ class FR7(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with 
   val tag_norm    = RegNext(in.bits.typeTagOut)
   val fclass_norm = RegNext(fclass)
   val sign_norm   = RegNext(sign)
-  val exp_norm    = RegInit(0.U(maxType.exp.W))
+  val exp_norm    = RegInit(0.U((maxType.exp+1).W))
   val sig_norm    = RegInit(0.U(7.W))
   val lz_norm     = RegInit(0.U(log2Ceil(maxType.sig-1).W))
   val count_mask  = PopCount(Masklower(sig))
   val sht_left    = maxType.sig-count_mask
-  when(fclass(2) || fclass(5)) {    
-    exp_norm := (count_mask+1.U-maxType.sig).sextTo(maxType.exp)
+  when(fclass(2) || fclass(5)) {
+    exp_norm := sht_left - 1.U
     sig_norm := (sig << sht_left)(maxType.sig-2, maxType.sig-8)
     lz_norm  := sht_left - 1.U
   } .otherwise {
@@ -1144,7 +1144,11 @@ class FR7(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with 
   // frsqrt7
   val exp_frsqrt = RegInit(0.S((maxType.exp+1).W))
   val sig_frsqrt = RegInit(0.U(7.W))
-  exp_frsqrt := (bias_frsqrt - exp_norm.asSInt) >> 1
+  when(fclass(2) || fclass(5)) {
+    exp_frsqrt := (bias_frsqrt + exp_norm.asSInt) >> 1
+  } .otherwise {
+    exp_frsqrt := (bias_frsqrt - exp_norm.asSInt) >> 1
+  }
   sig_frsqrt := frsqrt7_table(lut_addr_frsqrt)
 
   val h_frsqrt = WireInit(0.U(16.W))
