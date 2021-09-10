@@ -70,7 +70,7 @@ class ALU(withCarryIO: Boolean = false)(implicit p: Parameters) extends CoreModu
   val in1_xor_in2 = io.in1 ^ in2_inv
   io.adder_out := io.in1 + in2_inv + isSub(io.fn)
   if (withCarryIO) {
-    val adder: UInt = io.in1 +& in2_inv + (isSub(io.fn) ^ io.ci)
+    val adder: UInt = Cat(io.in1(xLen-1),io.in1) + Cat(in2_inv(xLen-1),in2_inv) + (isSub(io.fn) ^ io.ci)
     io.adder_out := adder(xLen-1, 0)
     io.co := adder(xLen)
   }
