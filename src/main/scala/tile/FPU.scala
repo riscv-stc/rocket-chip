@@ -16,9 +16,11 @@ import freechips.rocketchip.util._
 import freechips.rocketchip.util.property._
 
 case class FPUParams(
-  minFLen: Int = 32,
+  minFLen: Int = 16,
   fLen: Int = 64,
   divSqrt: Boolean = true,
+  zfhExt: Boolean = true,
+  hfmaLatency: Int = 3,
   sfmaLatency: Int = 3,
   dfmaLatency: Int = 4
 )
