@@ -153,9 +153,13 @@ object DefaultTestSuites {
 
   val rv32uf = new AssemblyTestSuite("rv32uf", rv64ufNames)(_)
   val rv32ud = new AssemblyTestSuite("rv32ud", rv64ufNames - "move")(_)
+  val rv32uzfh = new AssemblyTestSuite("rv32uzfh", rv64ufNames)(_)
 
   val rv64udNames = rv64ufNames + "structural"
   val rv64ud = new AssemblyTestSuite("rv64ud", rv64udNames)(_)
+
+  val rv64uzfhNames = rv64ufNames
+  val rv64uzfh = new AssemblyTestSuite("rv64uzfh", rv64uzfhNames)(_)
 
   val rv64siNames = rv32siNames
   val rv64si = new AssemblyTestSuite("rv64si", rv64siNames)(_)
