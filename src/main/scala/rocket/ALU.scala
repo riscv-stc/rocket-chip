@@ -17,8 +17,10 @@ object ALU
   def FN_SNE  = UInt(3, SZ_ALU_FN)
   def FN_XOR  = UInt(4, SZ_ALU_FN)
   def FN_SR   = UInt(5, SZ_ALU_FN)
-  def FN_OR   = UInt(6, SZ_ALU_FN)
-  def FN_AND  = UInt(7, SZ_ALU_FN)
+  def FN_ADC  = UInt(6, SZ_ALU_FN)
+  def FN_OR   = UInt(7, SZ_ALU_FN)
+  def FN_AND  = UInt(8, SZ_ALU_FN)
+  def FN_SBC  = UInt(9, SZ_ALU_FN)
   def FN_SUB  = UInt(10, SZ_ALU_FN)
   def FN_SRA  = UInt(11, SZ_ALU_FN)
   def FN_SLT  = UInt(12, SZ_ALU_FN)
@@ -70,9 +72,16 @@ class ALU(withCarryIO: Boolean = false)(implicit p: Parameters) extends CoreModu
   val in1_xor_in2 = io.in1 ^ in2_inv
   io.adder_out := io.in1 + in2_inv + isSub(io.fn)
   if (withCarryIO) {
-    val adder: UInt = Cat(io.in1(xLen-1),io.in1) + Cat(in2_inv(xLen-1),in2_inv) + (isSub(io.fn) ^ io.ci)
-    io.adder_out := adder(xLen-1, 0)
-    io.co := adder(xLen)
+    // ADD, SUB
+    val adder: UInt = io.in1 +& in2_inv + (isSub(io.fn) ^ io.ci)
+    // ADC, SBC
+    val in1Zext = Cat(0.U(1.W), io.in1)
+    val in2Zext = Cat(0.U(1.W), io.in2)
+    val in2ZextInv = Mux(isSub(io.fn), ~in2Zext, in2Zext)
+    val adcer: UInt = in1Zext + in2ZextInv + (isSub(io.fn) ^ io.ci)
+
+    io.adder_out := Mux(io.fn === FN_ADD || io.fn === FN_SUB, adder(xLen-1, 0), adcer(xLen-1, 0))
+    io.co        := Mux(io.fn === FN_ADD || io.fn === FN_SUB, adder(xLen), adcer(xLen))
   }
 
   // SLT, SLTU
@@ -101,7 +110,7 @@ class ALU(withCarryIO: Boolean = false)(implicit p: Parameters) extends CoreModu
   val logic = Mux(io.fn === FN_XOR || io.fn === FN_OR, in1_xor_in2, UInt(0)) |
               Mux(io.fn === FN_OR || io.fn === FN_AND, io.in1 & io.in2, UInt(0))
   val shift_logic = (isCmp(io.fn) && slt) | logic | shout
-  val out = Mux(io.fn === FN_ADD || io.fn === FN_SUB, io.adder_out, shift_logic)
+  val out = Mux(io.fn === FN_ADD || io.fn === FN_SUB || io.fn === FN_ADC || io.fn === FN_SBC, io.adder_out, shift_logic)
 
   io.out := out
   if (xLen > 32) {
