@@ -379,6 +379,34 @@ trait HasFPUParameters {
     }
   }
 
+  def unboxh(x: UInt, tag: UInt, exactType: Option[FType]): UInt = {
+    val outType = exactType.getOrElse(FType.S)
+    def helper(x: UInt, t: FType): Seq[(Bool, UInt)] = {
+      val prev =
+        if (t == minType) {
+          Seq()
+        } else {
+          val prevT = prevType(t)
+          val unswizzled = Cat(
+            x(prevT.sig + prevT.exp - 1),
+            x(t.sig - 1),
+            x(prevT.sig + prevT.exp - 2, 0))
+          val prev = helper(unswizzled, prevT)
+          val isbox = isBox(x, t)
+          prev.map(p => (isbox && p._1, p._2))
+        }
+      prev :+ (true.B, t.unsafeConvert(x, outType))
+    }
+
+    val (oks, floats) = helper(x, FType.S).unzip
+    if (exactType.isEmpty || floatTypes.size == 1) {
+      Mux(oks(tag), floats(tag), FType.S.qNaN)
+    } else {
+      val t = exactType.get
+      floats(typeTag(t)) | Mux(oks(typeTag(t)), 0.U, t.qNaN)
+    }
+  }
+
   // make sure that the redundant bits in the NaN-boxed encoding are consistent
   def consistent(x: UInt): Bool = {
     def helper(x: UInt, t: FType): Bool = if (typeTag(t) == 0) true.B else {
