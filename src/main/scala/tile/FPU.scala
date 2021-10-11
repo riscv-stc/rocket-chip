@@ -1064,8 +1064,9 @@ class FPU(cfg: FPUParams)(implicit p: Parameters) extends FPUModule()(p) {
 
 class FR7(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetimed{
   val io = new Bundle {
-    val in  = Valid(new FPInput).flip
-    val out = Valid(new FPResult)
+    val in     = Valid(new FPInput).flip
+    val out    = Valid(new FPResult)
+    val active = Input(Bool())
   }
 
   // address look-up table
@@ -1110,6 +1111,8 @@ class FR7(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with 
   val frec7_table = VecInit(frec7_seq)
 
   val in = Pipe(io.in)
+  val orig_data = Pipe(io.in.valid, io.in.bits.in3, latency)
+  val v_active  = Pipe(io.in.valid, io.active, latency)
 
   // classify (recoded) FP input
   // fclass[0] == 1, negative infinite
@@ -1273,4 +1276,8 @@ class FR7(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with 
   require(latency >= 3)
   val fr7Mux = Mux(typ_out, frec7Mux, frsqrt7Mux)
   io.out <> Pipe(valid_out, fr7Mux, latency-3)
+  when(!v_active.bits) {
+    io.out.bits.data := orig_data.bits
+    io.out.bits.exc  := 0.U
+  }
 }
