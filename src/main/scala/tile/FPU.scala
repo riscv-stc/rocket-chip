@@ -545,11 +545,16 @@ class FPToInt(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetime
           narrow.io.in := in.in1
           narrow.io.roundingMode := in.rm
           narrow.io.signedOut := ~in.typ(0)
-
-          val excSign = in.in1(maxExpWidth + maxSigWidth) && !maxType.isNaN(in.in1)
-          val excOut = Cat(conv.io.signedOut === excSign, Fill(w-1, !excSign))
-          val invalid = conv.io.intExceptionFlags(2) || narrow.io.intExceptionFlags(1)
-          when (invalid) { toint := Cat(conv.io.out >> w, excOut) }
+		   
+		  val cvtint16 = Module(new hardfloat.RecFNToIN(maxExpWidth, maxSigWidth, 16))
+          cvtint16.io.in := in.in1
+          cvtint16.io.roundingMode := in.rm
+          cvtint16.io.signedOut := ~in.typ(0)
+ 
+		  val excSign = in.in1(maxExpWidth + maxSigWidth) && !maxType.isNaN(in.in1)
+          val excOut = Cat(conv.io.signedOut === excSign, Mux(tag === H, Fill(15, !excSign), Fill(w-1, !excSign)))
+          val invalid = conv.io.intExceptionFlags(2) || narrow.io.intExceptionFlags(1) || (tag === H) && cvtint16.io.intExceptionFlags(1)
+          when (invalid) { toint := Mux(tag === H && (!cvtint16.io.intExceptionFlags(1) || in.typeTagIn(0)), conv.io.out >> 48, Cat(conv.io.out >> w, excOut)) }
           io.out.bits.exc := Cat(invalid, UInt(0, 3), !invalid && conv.io.intExceptionFlags(0))
         }
       }
