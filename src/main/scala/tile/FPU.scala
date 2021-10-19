@@ -566,7 +566,12 @@ class FPToInt(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetime
   io.out.bits.in := in
 }
 
-class IntToFP(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetimed {
+class IntToFP(
+  val latency: Int,
+  val supportD: Boolean = true,
+  val supportS: Boolean = false,
+  val vector: Boolean = false
+)(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetimed {
   val io = new Bundle {
     val in = Valid(new IntToFPInput).flip
     val out = Valid(new FPResult)
@@ -590,10 +595,19 @@ class IntToFP(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) w
     res.asUInt
   }
 
+  var supportTypes: List[FType] = null
+  if(supportD) {
+    supportTypes = FType.all
+  } else if(supportS) {
+    supportTypes = FType.all.take(2)
+  } else {
+    supportTypes = FType.all.take(1)
+  }
+
   when (in.bits.wflags) { // fcvt
     // could be improved for RVD/RVQ with a single variable-position rounding
     // unit, rather than N fixed-position ones
-    val i2fResults = for (t <- floatTypes) yield {
+    val i2fResults = for (t <- supportTypes) yield {
       val i2f = Module(new hardfloat.INToRecFN(xLen, t.exp, t.sig))
       i2f.io.signedIn := ~in.bits.typ(0)
       i2f.io.in := intValue
@@ -1067,7 +1081,11 @@ class FPU(cfg: FPUParams)(implicit p: Parameters) extends FPUModule()(p) {
     cover(cond, s"FPU_$label", "Core;;" + desc)
 }
 
-class FR7(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetimed{
+class FR7(
+  val latency: Int, 
+  val supportD: Boolean = false,
+  val supportS: Boolean = false
+)(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetimed{
   val io = new Bundle {
     val in     = Valid(new FPInput).flip
     val out    = Valid(new FPResult)
@@ -1131,7 +1149,15 @@ class FR7(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with 
   // fclass[8] == 1, signaling NaN
   // fclass[9] == 1, quiet NaN
   val tag    = in.bits.typeTagOut
-  val fclass = (floatTypes.map(t => t.classify(maxType.unsafeConvert(in.bits.in1, t))): Seq[UInt])(tag)
+  var supportTypes: List[FType] = null
+  if(supportD) {
+    supportTypes = FType.all
+  } else if(supportS) {
+    supportTypes = FType.all.take(2)
+  } else {
+    supportTypes = FType.all.take(1)
+  }
+  val fclass = (supportTypes.map(t => t.classify(maxType.unsafeConvert(in.bits.in1, t))): Seq[UInt])(tag)
 
   // frsqrt7, bias = 3 * exp_bias - 1
   val bias_frsqrt = Mux(tag === D, 3068.S, Mux(tag === S, 380.S, 44.S))
@@ -1140,9 +1166,9 @@ class FR7(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with 
 
   // extract sign, exp, sig(nificand) from ieee FP input
   val in_ieee = in.bits.in2
-  val sign = (floatTypes.map(t => in_ieee(t.exp+t.sig-1)) : Seq[UInt])(tag)
-  val exp  = (floatTypes.map(t => Cat(Wire(Fill(maxType.exp-t.exp, 0.U(1.W))), in_ieee(t.exp+t.sig-2, t.sig-1))) : Seq[UInt])(tag)
-  val sig  = (floatTypes.map(t => Cat(in_ieee(t.sig-2, 0), Wire(Fill(maxType.sig-t.sig, 0.U(1.W))))): Seq[UInt])(tag)
+  val sign = (supportTypes.map(t => in_ieee(t.exp+t.sig-1)) : Seq[UInt])(tag)
+  val exp  = (supportTypes.map(t => Cat(Wire(Fill(maxType.exp-t.exp, 0.U(1.W))), in_ieee(t.exp+t.sig-2, t.sig-1))) : Seq[UInt])(tag)
+  val sig  = (supportTypes.map(t => Cat(in_ieee(t.sig-2, 0), Wire(Fill(maxType.sig-t.sig, 0.U(1.W))))): Seq[UInt])(tag)
 
   // normalize inputs when subnormal
   val valid_norm  = RegNext(in.valid)
@@ -1182,7 +1208,7 @@ class FR7(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with 
   // frsqrt7
   val exp_frsqrt = RegInit(0.S((maxType.exp+1).W))
   val sig_frsqrt = RegInit(0.U(7.W))
-  when(fclass(2) || fclass(5)) {
+  when(fclass_norm(2) || fclass_norm(5)) {
     exp_frsqrt := (bias_frsqrt + exp_norm.asSInt) >> 1
   } .otherwise {
     exp_frsqrt := (bias_frsqrt - exp_norm.asSInt) >> 1
@@ -1190,32 +1216,62 @@ class FR7(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with 
   sig_frsqrt := frsqrt7_table(lut_addr_frsqrt)
 
   val h_frsqrt = WireInit(0.U(16.W))
-  val s_frsqrt = WireInit(0.U(32.W))
-  val d_frsqrt = WireInit(0.U(64.W))
+  var s_frsqrt = WireInit(0.U(32.W))
+  var d_frsqrt = WireInit(0.U(64.W))
+  // output selection based on fclass results
   when(fclass_out(5) || fclass_out(6)) {
     h_frsqrt := Cat(sign_out, exp_frsqrt( 4, 0), sig_frsqrt, Fill( 3, 0.U(1.W)))
-    s_frsqrt := Cat(sign_out, exp_frsqrt( 7, 0), sig_frsqrt, Fill(16, 0.U(1.W)))
-    d_frsqrt := Cat(sign_out, exp_frsqrt(10, 0), sig_frsqrt, Fill(45, 0.U(1.W)))
   } .elsewhen(fclass_out(7)) {
     // zero
     h_frsqrt := Fill(16, 0.U(1.W))
-    s_frsqrt := Fill(32, 0.U(1.W))
-    d_frsqrt := Fill(64, 0.U(1.W))
   } .elsewhen(fclass_out(3) || fclass_out(4)) {
     // infinite
     h_frsqrt := Cat(sign_out, Fill( 5, 1.U(1.W)), Fill(10, 0.U(1.W)))
-    s_frsqrt := Cat(sign_out, Fill( 8, 1.U(1.W)), Fill(23, 0.U(1.W)))
-    d_frsqrt := Cat(sign_out, Fill(11, 1.U(1.W)), Fill(52, 0.U(1.W)))
   } .otherwise {
     // canonical NaN
     h_frsqrt := Cat(sign_out, Fill( 6, 1.U(1.W)), Fill( 9, 0.U(1.W)))
-    s_frsqrt := Cat(sign_out, Fill( 9, 1.U(1.W)), Fill(22, 0.U(1.W)))
-    d_frsqrt := Cat(sign_out, Fill(12, 1.U(1.W)), Fill(51, 0.U(1.W)))
+  }
+  // for single-precision
+  if(supportD || supportS) {
+    // output selection based on fclass results
+    when(fclass_out(5) || fclass_out(6)) {
+      s_frsqrt := Cat(sign_out, exp_frsqrt( 7, 0), sig_frsqrt, Fill(16, 0.U(1.W)))
+    } .elsewhen(fclass_out(7)) {
+      // zero
+      s_frsqrt := Fill(32, 0.U(1.W))
+    } .elsewhen(fclass_out(3) || fclass_out(4)) {
+      // infinite
+      s_frsqrt := Cat(sign_out, Fill( 8, 1.U(1.W)), Fill(23, 0.U(1.W)))
+    } .otherwise {
+      // canonical NaN
+      s_frsqrt := Cat(sign_out, Fill( 9, 1.U(1.W)), Fill(22, 0.U(1.W)))
+    }
+  }
+  // for double-precision
+  if(supportD) {
+    when(fclass_out(5) || fclass_out(6)) {
+      d_frsqrt := Cat(sign_out, exp_frsqrt(10, 0), sig_frsqrt, Fill(45, 0.U(1.W)))
+    } .elsewhen(fclass_out(7)) {
+      // zero
+      d_frsqrt := Fill(64, 0.U(1.W))
+    } .elsewhen(fclass_out(3) || fclass_out(4)) {
+      // infinite
+      d_frsqrt := Cat(sign_out, Fill(11, 1.U(1.W)), Fill(52, 0.U(1.W)))
+    } .otherwise {
+      // canonical NaN
+      d_frsqrt := Cat(sign_out, Fill(12, 1.U(1.W)), Fill(51, 0.U(1.W)))
+    }
   }
 
   val frsqrt7Mux = Wire(new FPResult)
-  frsqrt7Mux.data := Mux(tag_out === H, Fill(4, h_frsqrt),
-                     Mux(tag_out === S, Fill(2, s_frsqrt), d_frsqrt))
+  if(supportD) {
+    frsqrt7Mux.data := Mux(tag_out === H, Fill(4, h_frsqrt),
+                       Mux(tag_out === S, Fill(2, s_frsqrt), d_frsqrt))
+  } else if(supportS) {
+    frsqrt7Mux.data := Mux(tag_out === H, Fill(4, h_frsqrt), Fill(2, s_frsqrt))
+  } else {
+    frsqrt7Mux.data := Fill(4, h_frsqrt)
+  }
   frsqrt7Mux.exc  := Mux(fclass_out(0) || fclass_out(1) || fclass_out(2) || fclass_out(8), 16.U,
                      Mux(fclass_out(3) || fclass_out(4), 8.U, 0.U))
   
@@ -1233,47 +1289,87 @@ class FR7(val latency: Int)(implicit p: Parameters) extends FPUModule()(p) with 
                      Cat(sig_frec, Fill(2, 0.U(1.W)))))
 
   val h_frec = WireInit(0.U(16.W))
-  val s_frec = WireInit(0.U(32.W))
-  val d_frec = WireInit(0.U(64.W))
+  var s_frec = WireInit(0.U(32.W))
+  var d_frec = WireInit(0.U(64.W))
   when(fclass_out(0) || fclass_out(7)) {
     // 0.0
     h_frec := Cat(sign_out, Fill(15, 0.U(1.W)))
-    s_frec := Cat(sign_out, Fill(31, 0.U(1.W)))
-    d_frec := Cat(sign_out, Fill(63, 0.U(1.W)))
   } .elsewhen(fclass_out(2) && lz_out > 1.U && (frm_out === 1.U || frm_out === 3.U)) {
     // RTZ || RUP -> greatest-mag, negative
     h_frec := Cat(1.U(1.W), Fill( 4, 1.U(1.W)), 0.U(1.W), Fill(10, 1.U(1.W)))
-    s_frec := Cat(1.U(1.W), Fill( 7, 1.U(1.W)), 0.U(1.W), Fill(23, 1.U(1.W)))
-    d_frec := Cat(1.U(1.W), Fill(10, 1.U(1.W)), 0.U(1.W), Fill(52, 1.U(1.W)))
   } .elsewhen((fclass_out(2) && lz_out > 1.U) || fclass_out(3)) {
     // negative infinite
     h_frec := Cat(1.U(1.W), Fill( 5, 1.U(1.W)), Fill(10, 0.U(1.W)))
-    s_frec := Cat(1.U(1.W), Fill( 8, 1.U(1.W)), Fill(23, 0.U(1.W)))
-    d_frec := Cat(1.U(1.W), Fill(11, 1.U(1.W)), Fill(52, 0.U(1.W)))
   } .elsewhen(fclass_out(5) && lz_out > 1.U && (frm_out === 1.U || frm_out === 2.U)) {
     // RTZ || RDN -> greatest-mag, positive
     h_frec := Cat(0.U(1.W), Fill( 4, 1.U(1.W)), 0.U(1.W), Fill(10, 1.U(1.W)))
-    s_frec := Cat(0.U(1.W), Fill( 7, 1.U(1.W)), 0.U(1.W), Fill(23, 1.U(1.W)))
-    d_frec := Cat(0.U(1.W), Fill(10, 1.U(1.W)), 0.U(1.W), Fill(52, 1.U(1.W)))
   } .elsewhen((fclass_out(5) && lz_out > 1.U) || fclass_out(4)) {
     // positive infinite
     h_frec := Cat(0.U(1.W), Fill( 5, 1.U(1.W)), Fill(10, 0.U(1.W)))
-    s_frec := Cat(0.U(1.W), Fill( 8, 1.U(1.W)), Fill(23, 0.U(1.W)))
-    d_frec := Cat(0.U(1.W), Fill(11, 1.U(1.W)), Fill(52, 0.U(1.W)))
   } .elsewhen(fclass_out(8) || fclass_out(9)) {
     // canonical NaN
     h_frec := Cat(sign_out, Fill( 6, 1.U(1.W)), Fill( 9, 0.U(1.W)))
-    s_frec := Cat(sign_out, Fill( 9, 1.U(1.W)), Fill(22, 0.U(1.W)))
-    d_frec := Cat(sign_out, Fill(12, 1.U(1.W)), Fill(51, 0.U(1.W)))
   } .otherwise {
     h_frec := Cat(sign_out, exp_frec_out( 4, 0), sig_frec_out, Fill( 1, 0.U(1.W)))
-    s_frec := Cat(sign_out, exp_frec_out( 7, 0), sig_frec_out, Fill(14, 0.U(1.W)))
-    d_frec := Cat(sign_out, exp_frec_out(10, 0), sig_frec_out, Fill(43, 0.U(1.W)))
+  }
+  // for single-precision
+  if(supportD || supportS) {
+    when(fclass_out(0) || fclass_out(7)) {
+      // 0.0
+      s_frec := Cat(sign_out, Fill(31, 0.U(1.W)))
+    } .elsewhen(fclass_out(2) && lz_out > 1.U && (frm_out === 1.U || frm_out === 3.U)) {
+      // RTZ || RUP -> greatest-mag, negative
+      s_frec := Cat(1.U(1.W), Fill( 7, 1.U(1.W)), 0.U(1.W), Fill(23, 1.U(1.W)))
+    } .elsewhen((fclass_out(2) && lz_out > 1.U) || fclass_out(3)) {
+      // negative infinite
+      s_frec := Cat(1.U(1.W), Fill( 8, 1.U(1.W)), Fill(23, 0.U(1.W)))
+    } .elsewhen(fclass_out(5) && lz_out > 1.U && (frm_out === 1.U || frm_out === 2.U)) {
+      // RTZ || RDN -> greatest-mag, positive
+      s_frec := Cat(0.U(1.W), Fill( 7, 1.U(1.W)), 0.U(1.W), Fill(23, 1.U(1.W)))
+    } .elsewhen((fclass_out(5) && lz_out > 1.U) || fclass_out(4)) {
+      // positive infinite
+      s_frec := Cat(0.U(1.W), Fill( 8, 1.U(1.W)), Fill(23, 0.U(1.W)))
+    } .elsewhen(fclass_out(8) || fclass_out(9)) {
+      // canonical NaN
+      s_frec := Cat(sign_out, Fill( 9, 1.U(1.W)), Fill(22, 0.U(1.W)))
+    } .otherwise {
+      s_frec := Cat(sign_out, exp_frec_out( 7, 0), sig_frec_out, Fill(14, 0.U(1.W)))
+    }
+  }
+  // for double-precision
+  if(supportD) {
+    when(fclass_out(0) || fclass_out(7)) {
+      // 0.0
+      d_frec := Cat(sign_out, Fill(63, 0.U(1.W)))
+    } .elsewhen(fclass_out(2) && lz_out > 1.U && (frm_out === 1.U || frm_out === 3.U)) {
+      // RTZ || RUP -> greatest-mag, negative
+      d_frec := Cat(1.U(1.W), Fill(10, 1.U(1.W)), 0.U(1.W), Fill(52, 1.U(1.W)))
+    } .elsewhen((fclass_out(2) && lz_out > 1.U) || fclass_out(3)) {
+      // negative infinite
+      d_frec := Cat(1.U(1.W), Fill(11, 1.U(1.W)), Fill(52, 0.U(1.W)))
+    } .elsewhen(fclass_out(5) && lz_out > 1.U && (frm_out === 1.U || frm_out === 2.U)) {
+      // RTZ || RDN -> greatest-mag, positive
+      d_frec := Cat(0.U(1.W), Fill(10, 1.U(1.W)), 0.U(1.W), Fill(52, 1.U(1.W)))
+    } .elsewhen((fclass_out(5) && lz_out > 1.U) || fclass_out(4)) {
+      // positive infinite
+      d_frec := Cat(0.U(1.W), Fill(11, 1.U(1.W)), Fill(52, 0.U(1.W)))
+    } .elsewhen(fclass_out(8) || fclass_out(9)) {
+      // canonical NaN
+      d_frec := Cat(sign_out, Fill(12, 1.U(1.W)), Fill(51, 0.U(1.W)))
+    } .otherwise {
+      d_frec := Cat(sign_out, exp_frec_out(10, 0), sig_frec_out, Fill(43, 0.U(1.W)))
+    }
   }
 
   val frec7Mux = Wire(new FPResult)
-  frec7Mux.data := Mux(tag_out === H, Fill(4, h_frec),
-                   Mux(tag_out === S, Fill(2, s_frec), d_frec))
+  if(supportD){
+    frec7Mux.data := Mux(tag_out === H, Fill(4, h_frec),
+                     Mux(tag_out === S, Fill(2, s_frec), d_frec))  
+  } else if(supportS) {
+    frec7Mux.data := Mux(tag_out === H, Fill(4, h_frec), Fill(2, s_frec))
+  } else {
+    frec7Mux.data := Fill(4, h_frec)
+  }
   frec7Mux.exc  := Mux((fclass_out(2) || fclass_out(5)) && lz_out > 1.U, 5.U,
                    Mux( fclass_out(3) || fclass_out(4), 8.U, 
                    Mux( fclass_out(8), 16.U, 0.U)))
