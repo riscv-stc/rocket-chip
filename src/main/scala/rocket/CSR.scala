@@ -430,7 +430,7 @@ class CSRFile(
   val reg_fflags = Reg(UInt(width = 5))
   val reg_frm = Reg(UInt(width = 3))
   val reg_vconfig = usingVector.option(Reg(new VConfig))
-  val reg_vstart = usingVector.option(Reg(UInt(maxVLMax.log2.W)))
+  val reg_vstart = usingVector.option(RegInit(0.U(maxVLMax.log2.W)))
   val reg_vxsat = usingVector.option(Reg(Bool()))
   val reg_vxrm = usingVector.option(Reg(UInt(io.vector.get.vxrm.getWidth.W)))
 
