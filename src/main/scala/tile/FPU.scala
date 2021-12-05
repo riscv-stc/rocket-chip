@@ -235,16 +235,16 @@ class IntToFPInput(implicit p: Parameters) extends CoreBundle()(p) with HasFPUCt
   val in1 = Bits(width = xLen)
 }
 
-class FPInput(implicit p: Parameters) extends CoreBundle()(p) with HasFPUCtrlSigs {
+class FPInput(val vector: Boolean = false)(implicit p: Parameters) extends CoreBundle()(p) with HasFPUCtrlSigs {
   val rm = Bits(width = FPConstants.RM_SZ)
   val fmaCmd = Bits(width = 2)
   val typ = Bits(width = 2)
   val fmt = Bits(width = 2)
-  val in1 = Bits(width = fLen+1)
-  val in2 = Bits(width = fLen+1)
-  val in3 = Bits(width = fLen+1)
+  val in1 = if (vector) Bits(width = vLen) else Bits(width = fLen+1)
+  val in2 = if (vector) Bits(width = vLen) else Bits(width = fLen+1)
+  val in3 = if (vector) Bits(width = vLen) else Bits(width = fLen+1)
 
-  override def cloneType = new FPInput().asInstanceOf[this.type]
+  override def cloneType = new FPInput(true).asInstanceOf[this.type]
 }
 
 case class FType(exp: Int, sig: Int) {
