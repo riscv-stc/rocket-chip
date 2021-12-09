@@ -372,12 +372,14 @@ trait HasFPUParameters {
       prev :+ (true.B, t.unsafeConvert(x, outType))
     }
 
-    val (oks, floats) = helper(x, maxType).unzip
+    //val (oks, floats) = helper(x, maxType).unzip
+    val (oks, floats) = helper(x, outType).unzip
     if (exactType.isEmpty || floatTypes.size == 1) {
       Mux(oks(tag), floats(tag), maxType.qNaN)
     } else {
       val t = exactType.get
-      floats(typeTag(t)) | Mux(oks(typeTag(t)), 0.U, t.qNaN)
+      //floats(typeTag(t)) | Mux(oks(typeTag(t)), 0.U, t.qNaN)
+      floats(tag) | Mux(oks(tag), 0.U, t.qNaN)
     }
   }
 
@@ -465,6 +467,23 @@ trait HasFPUParameters {
     // fill MSBs of subword loads to emulate a wider load of a NaN-boxed value
     val boxes = floatTypes.map(t => UInt((BigInt(1) << maxType.ieeeWidth) - (BigInt(1) << t.ieeeWidth)))
     helper(boxes(tag) | x, maxType)
+  }
+
+  def recode(x: UInt, xtag: UInt, toType: Option[FType]): UInt = {
+    val outType = toType.getOrElse(maxType)
+    def helper(x: UInt, t: FType): UInt = {
+      if (typeTag(t) == 0) {
+        t.recode(x)
+      } else {
+        val prevT = prevType(t)
+        box(t.recode(x), t, helper(x, prevT), prevT)
+      }
+    }
+
+    // fill MSBs of subword loads to emulate a wider load of a NaN-boxed value
+    val boxes = floatTypes.filter(t => t.ieeeWidth <= outType.ieeeWidth)
+                          .map(t => UInt((BigInt(1) << outType.ieeeWidth) - (BigInt(1) << t.ieeeWidth)))
+    helper(boxes(xtag) | x, outType)
   }
 
   // implement NaN unboxing and un-recoding for FS*/fmv.x.*
