@@ -244,7 +244,7 @@ class FPInput(val vector: Boolean = false)(implicit p: Parameters) extends CoreB
   val in2 = if (vector) Bits(width = vLen) else Bits(width = fLen+1)
   val in3 = if (vector) Bits(width = vLen) else Bits(width = fLen+1)
 
-  override def cloneType = new FPInput(true).asInstanceOf[this.type]
+  override def cloneType = new FPInput(vector).asInstanceOf[this.type]
 }
 
 case class FType(exp: Int, sig: Int) {
