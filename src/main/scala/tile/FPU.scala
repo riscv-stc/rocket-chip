@@ -353,7 +353,7 @@ trait HasFPUParameters {
   }
 
   // implement NaN unboxing for FU inputs
-  def unbox(x: UInt, tag: UInt, exactType: Option[FType]): UInt = {
+  def unbox(x: UInt, tag: UInt, exactType: Option[FType], isInMaxType: Boolean = true): UInt = {
     val outType = exactType.getOrElse(maxType)
     def helper(x: UInt, t: FType): Seq[(Bool, UInt)] = {
       val prev =
@@ -372,8 +372,8 @@ trait HasFPUParameters {
       prev :+ (true.B, t.unsafeConvert(x, outType))
     }
 
-    //val (oks, floats) = helper(x, maxType).unzip
-    val (oks, floats) = helper(x, outType).unzip
+    val (oks, floats) = if(isInMaxType) helper(x, maxType).unzip else helper(x, outType).unzip
+    //val (oks, floats) = helper(x, outType).unzip
     if (exactType.isEmpty || floatTypes.size == 1) {
       Mux(oks(tag), floats(tag), maxType.qNaN)
     } else {

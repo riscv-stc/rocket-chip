@@ -54,7 +54,7 @@ object ALU
 
 import ALU._
 /*
-class ALU(withCarryIO: Boolean = false)(implicit p: Parameters) extends CoreModule()(p) {
+class ALU(withCarryIO: Boolean = false, vector: Boolean = false)(implicit p: Parameters) extends CoreModule()(p) {
   val io = new Bundle {
     val dw = Bits(INPUT, SZ_DW)
     val fn = Bits(INPUT, SZ_ALU_FN)
@@ -117,12 +117,12 @@ class ALU(withCarryIO: Boolean = false)(implicit p: Parameters) extends CoreModu
     require(xLen == 64)
     when (io.dw === DW_32) { io.out := Cat(Fill(32, out(31)), out(31,0)) }
   }
-}
-*/
+} */
 
 class ALU(
   val dataWidth: Int = 64,
-  val withCarryIO: Boolean = false
+  val withCarryIO: Boolean = false,
+  val vector: Boolean = false
 )(implicit p: Parameters) extends CoreModule()(p) {
   val io = new Bundle {
     val dw = Bits(INPUT, SZ_DW)
@@ -158,9 +158,6 @@ class ALU(
     Mux(io.in1(dataWidth-1) === io.in2(dataWidth-1), io.adder_out(dataWidth-1),
     Mux(cmpUnsigned(io.fn), io.in2(dataWidth-1), io.in1(dataWidth-1)))
   io.cmp_out := cmpInverted(io.fn) ^ Mux(cmpEq(io.fn), in1_xor_in2 === UInt(0), slt)
-  val cmpOut = Mux((io.fn === FN_SLT || io.fn === FN_SLTU) && slt,  io.in1,
-               Mux((io.fn === FN_SGE || io.fn === FN_SGEU) && !slt, io.in1,
-                                                                    io.in2))
 
   // SLL, SRL, SRA
   val (shamt, shin_r) =
@@ -182,10 +179,18 @@ class ALU(
   // AND, OR, XOR
   val logic = Mux(io.fn === FN_XOR || io.fn === FN_OR, in1_xor_in2, UInt(0)) |
               Mux(io.fn === FN_OR || io.fn === FN_AND, io.in1 & io.in2, UInt(0))
-  //val shift_logic = (isCmp(io.fn) && slt) | logic | shout
-  val shift_logic = logic | shout
-  val out = Mux(io.fn === FN_ADD || io.fn === FN_SUB || io.fn === FN_ADC || io.fn === FN_SBC, io.adder_out, 
-            Mux(isCmp(io.fn), cmpOut, shift_logic))
+  val out = Wire(UInt(dataWidth.W))
+  if(vector) {
+    val shift_logic = logic | shout
+    val cmpOut = Mux((io.fn === FN_SLT || io.fn === FN_SLTU) && slt,  io.in1,
+                 Mux((io.fn === FN_SGE || io.fn === FN_SGEU) && !slt, io.in1,
+                                                                      io.in2))
+    out := Mux(io.fn === FN_ADD || io.fn === FN_SUB || io.fn === FN_ADC || io.fn === FN_SBC, io.adder_out, 
+           Mux(isCmp(io.fn), cmpOut, shift_logic))
+  } else {
+    val shift_logic = (isCmp(io.fn) && slt) | logic | shout
+    out := Mux(io.fn === FN_ADD || io.fn === FN_SUB || io.fn === FN_ADC || io.fn === FN_SBC, io.adder_out, shift_logic)
+  }
 
   io.out := out
   if (dataWidth > 32) {
