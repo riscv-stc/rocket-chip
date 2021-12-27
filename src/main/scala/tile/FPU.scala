@@ -505,7 +505,7 @@ trait HasFPUParameters {
 
 abstract class FPUModule(implicit val p: Parameters) extends Module with HasCoreParameters with HasFPUParameters
 
-class FPToInt(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetimed {
+class FPToInt(vector: Boolean = false)(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetimed {
   class Output extends Bundle {
     val in = new FPInput
     val lt = Bool()
@@ -549,6 +549,7 @@ class FPToInt(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetime
 
     when (!in.ren2) { // fcvt
       val cvtType = in.typ.extract(log2Ceil(nIntTypes), 1)
+      val excSign = in.in1(maxExpWidth + maxSigWidth) && !maxType.isNaN(in.in1)
       intType := cvtType
       val conv = Module(new hardfloat.RecFNToIN(maxExpWidth, maxSigWidth, xLen))
       conv.io.in := in.in1
@@ -557,6 +558,40 @@ class FPToInt(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetime
       toint := conv.io.out
       io.out.bits.exc := Cat(conv.io.intExceptionFlags(2, 1).orR, UInt(0, 3), conv.io.intExceptionFlags(0))
 
+      val conv32 = Module(new hardfloat.RecFNToIN(maxExpWidth, maxSigWidth, 32))
+      conv32.io.in := in.in1
+      conv32.io.roundingMode := in.rm
+      conv32.io.signedOut    := ~in.typ(0)
+      when(cvtType === 0.U) {
+        val excOut  = Cat(conv.io.signedOut === excSign, Fill(31, !excSign))
+        val invalid = conv.io.intExceptionFlags(2) || conv32.io.intExceptionFlags(1)
+        when(invalid) { toint := Cat(conv.io.out >> 32, excOut) }
+        io.out.bits.exc := Cat(invalid, UInt(0, 3), !invalid && conv.io.intExceptionFlags(0))
+      }
+
+      val conv16 = Module(new hardfloat.RecFNToIN(maxExpWidth, maxSigWidth, 16))
+      conv16.io.in := in.in1
+      conv16.io.roundingMode := in.rm
+      conv16.io.signedOut    := ~in.typ(0)
+      when(cvtType === 0.U && tag === H && !in.wen) {
+        val excOut  = Cat(conv.io.signedOut === excSign, Fill(15, !excSign))
+        val invalid = conv.io.intExceptionFlags(2) || conv32.io.intExceptionFlags(1) || conv16.io.intExceptionFlags(1)
+        when(invalid) { toint := Mux(!conv16.io.intExceptionFlags(1) || in.typeTagIn(0), conv.io.out >> 48, Cat(conv.io.out >> 32, excOut)) }
+        io.out.bits.exc := Cat(invalid, UInt(0, 3), !invalid && conv.io.intExceptionFlags(0))
+      }
+
+      if(vector) {
+        val conv8 = Module(new hardfloat.RecFNToIN(maxExpWidth, maxSigWidth, 8))
+        conv8.io.in := in.in1
+        conv8.io.roundingMode := in.rm
+        conv8.io.signedOut    := ~in.typ(0)
+        when(cvtType === 0.U && tag === H && in.wen) {
+          toint := conv8.io.out
+          io.out.bits.exc := Cat(conv8.io.intExceptionFlags(2, 1).orR, 0.U(3.W),  conv8.io.intExceptionFlags(0))
+        }
+      }
+
+      /*
       for (i <- 0 until nIntTypes-1) {
         val w = minXLen << i
         when (cvtType === i) {
@@ -565,18 +600,18 @@ class FPToInt(implicit p: Parameters) extends FPUModule()(p) with ShouldBeRetime
           narrow.io.roundingMode := in.rm
           narrow.io.signedOut := ~in.typ(0)
 		   
-		  val cvtint16 = Module(new hardfloat.RecFNToIN(maxExpWidth, maxSigWidth, 16))
+		      val cvtint16 = Module(new hardfloat.RecFNToIN(maxExpWidth, maxSigWidth, 16))
           cvtint16.io.in := in.in1
           cvtint16.io.roundingMode := in.rm
           cvtint16.io.signedOut := ~in.typ(0)
  
-		  val excSign = in.in1(maxExpWidth + maxSigWidth) && !maxType.isNaN(in.in1)
+		      val excSign = in.in1(maxExpWidth + maxSigWidth) && !maxType.isNaN(in.in1)
           val excOut = Cat(conv.io.signedOut === excSign, Mux(tag === H, Fill(15, !excSign), Fill(w-1, !excSign)))
           val invalid = conv.io.intExceptionFlags(2) || narrow.io.intExceptionFlags(1) || (tag === H) && cvtint16.io.intExceptionFlags(1)
           when (invalid) { toint := Mux(tag === H && (!cvtint16.io.intExceptionFlags(1) || in.typeTagIn(0)), conv.io.out >> 48, Cat(conv.io.out >> w, excOut)) }
           io.out.bits.exc := Cat(invalid, UInt(0, 3), !invalid && conv.io.intExceptionFlags(0))
         }
-      }
+      }*/
     }
   }
 
