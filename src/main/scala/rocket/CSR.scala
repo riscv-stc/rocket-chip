@@ -185,6 +185,7 @@ class CSRDecodeIO extends Bundle {
   val csr = UInt(INPUT, CSR.ADDRSZ)
   val fp_illegal = Bool(OUTPUT)
   val vector_illegal = Bool(OUTPUT)
+  val matrix_illegal = Bool(OUTPUT)
   val fp_csr = Bool(OUTPUT)
   val rocc_illegal = Bool(OUTPUT)
   val read_illegal = Bool(OUTPUT)
@@ -245,6 +246,14 @@ class CSRFileIO(implicit p: Parameters) extends CoreBundle
     val set_vstart = Valid(vstart).flip
     val set_vxsat = Bool().asInput
   })
+
+  val matrix = usingMatrix.option(new Bundle {
+    val mconfig = new MType().asOutput
+    val tilem = UInt(xLen.W).asOutput
+    val tilen = UInt(xLen.W).asOutput
+    val tilek = UInt(xLen.W).asOutput
+    val tsidx = UInt(xLen.W).asOutput
+  })
 }
 
 class VConfig(implicit p: Parameters) extends CoreBundle {
@@ -302,6 +311,18 @@ class VType(implicit p: Parameters) extends CoreBundle {
     val isZero = vill || useZero
     Mux(!isZero && atLeastVLMax, vlMax, 0.U) | Mux(!isZero && !atLeastVLMax, avl_lsbs, 0.U)
   }
+}
+
+//matrix-ext CSR
+class MType(implicit p: Parameters) extends CoreBundle {
+  val mill = Bool()
+  val maccq = Bool()
+  val reserved = UInt((xLen - 10).W)
+  val mlmul = UInt(3.W)
+  val mta = Bool()
+  val mltr = Bool()
+  val mrtr = Bool()
+  val msew = UInt(2.W)
 }
 
 class CSRFile(
@@ -401,7 +422,7 @@ class CSRFile(
 
   val reset_mnstatus = Wire(init=new MStatus().fromBits(0))
   reset_mnstatus.mpp := PRV.M
-  val reg_mnscratch = Reg(Bits(width = xLen))
+  val reg_mnscratch = RegInit(0.U(Bits(width = xLen)))
   val reg_mnepc = Reg(UInt(width = vaddrBitsExtended))
   val reg_mncause = RegInit(0.U(xLen.W))
   val reg_mnstatus = Reg(init=reset_mnstatus)
@@ -433,6 +454,12 @@ class CSRFile(
   val reg_vstart = usingVector.option(RegInit(0.U(maxVLMax.log2.W)))
   val reg_vxsat = usingVector.option(Reg(Bool()))
   val reg_vxrm = usingVector.option(Reg(UInt(io.vector.get.vxrm.getWidth.W)))
+  val reg_mconfig = usingMatrix.option(Reg(new MType))
+  val reg_tilem = usingMatrix.option(RegInit(0.U(xLen.W)))
+  val reg_tilen = usingMatrix.option(RegInit(0.U(xLen.W)))
+  val reg_tilek = usingMatrix.option(RegInit(0.U(xLen.W)))
+  val reg_tsidx = usingMatrix.option(RegInit(0.U(xLen.W)))
+
 
   val reg_mcountinhibit = RegInit(0.U((CSR.firstHPM + nPerfCounters).W))
   io.inhibit_cycle := reg_mcountinhibit(0)
@@ -543,11 +570,20 @@ class CSRFile(
     CSRs.vl -> reg_vconfig.get.vl,
     CSRs.vlenb -> (vLen / 8).U)
 
+  val matrix_csrs = if(!usingMatrix) LinkedHashMap() else LinkedHashMap[Int,Bits](
+    CSRs.tilem -> reg_tilem.get,
+    CSRs.tilen -> reg_tilen.get,
+    CSRs.tilek -> reg_tilek.get,
+    CSRs.mtype -> reg_mconfig.get.asUInt,
+    CSRs.tsidx -> reg_tsidx.get
+  )
+
   read_mapping ++= debug_csrs
   read_mapping ++= nmi_csrs
   read_mapping ++= context_csrs
   read_mapping ++= fp_csrs
   read_mapping ++= vector_csrs
+  read_mapping ++= matrix_csrs
 
   if (coreParams.haveBasicCounters) {
     read_mapping += CSRs.mcountinhibit -> reg_mcountinhibit
@@ -667,6 +703,7 @@ class CSRFile(
       (!usingSupervisor || reg_mstatus.prv >= PRV.S || read_scounteren(counter_addr))
     io_dec.fp_illegal := io.status.fs === 0 || !reg_misa('f'-'a')
     io_dec.vector_illegal := io.status.vs === 0 || !reg_misa('v'-'a')
+    //io_dec.matrix_illegal := !reg_misa('mt'-'a')  //TODO
     io_dec.fp_csr := decodeFast(fp_csrs.keys.toList)
     io_dec.rocc_illegal := io.status.xs === 0 || !reg_misa('x'-'a')
     io_dec.read_illegal := reg_mstatus.prv < io_dec.csr(9,8) ||

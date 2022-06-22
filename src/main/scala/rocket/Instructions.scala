@@ -931,6 +931,11 @@ object CSRs {
   val vxsat = 0x9
   val vxrm = 0xa
   val vcsr = 0xf
+  val tilem = 0xc40
+  val tilen = 0xc41
+  val tilek = 0xc42
+  val mtype = 0xc43
+  val tsidx = 0xc44
   val uscratch = 0x40
   val uepc = 0x41
   val ucause = 0x42

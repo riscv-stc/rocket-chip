@@ -3,7 +3,7 @@
 package freechips.rocketchip.tile
 
 import Chisel._
-
+import com.sun.jdi.BooleanValue
 import freechips.rocketchip.config._
 import freechips.rocketchip.rocket._
 import freechips.rocketchip.util._
@@ -23,6 +23,7 @@ trait CoreParams {
   val useCompressed: Boolean
   val useBitManip: Boolean = false
   val useVector: Boolean
+  val useMatrix: Boolean
   val useSCIE: Boolean
   val useRVE: Boolean
   val mulDiv: Option[MulDivParams]
@@ -62,6 +63,7 @@ trait CoreParams {
   def sLen: Int = 0
   def eLen: Int = 64
   def vMemDataBits: Int = 0
+  def mLen: Int = 0
 }
 
 trait HasCoreParameters extends HasTileParameters {
@@ -78,6 +80,7 @@ trait HasCoreParameters extends HasTileParameters {
   val usingCompressed = coreParams.useCompressed
   val usingBitManip = coreParams.useBitManip
   val usingVector = coreParams.useVector
+  val usingMatrix = coreParams.useMatrix
   val usingSCIE = coreParams.useSCIE
   val usingNMI = coreParams.useNMI
 
@@ -104,6 +107,7 @@ trait HasCoreParameters extends HasTileParameters {
   def eLen = coreParams.eLen
   def vMemDataBits = if (usingVector) coreParams.vMemDataBits else 0
   def maxVLMax = vLen
+  def mLen = coreParams.mLen
 
   if (usingVector) {
     require(isPow2(vLen), s"vLen ($vLen) must be a power of 2")
