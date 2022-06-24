@@ -64,6 +64,8 @@ trait CoreParams {
   def eLen: Int = 64
   def vMemDataBits: Int = 0
   def mLen: Int = 0
+  def tileRows: Int = 0
+  def tileCols: Int = 0
 }
 
 trait HasCoreParameters extends HasTileParameters {
@@ -108,6 +110,12 @@ trait HasCoreParameters extends HasTileParameters {
   def vMemDataBits = if (usingVector) coreParams.vMemDataBits else 0
   def maxVLMax = vLen
   def mLen = coreParams.mLen
+  def tileRows = coreParams.tileRows
+  def tileCols = coreParams.tileCols
+
+
+  def meshRows = mLen/(vLen*tileRows)
+  def meshCols = vLen/(16*tileCols)
 
   if (usingVector) {
     require(isPow2(vLen), s"vLen ($vLen) must be a power of 2")
