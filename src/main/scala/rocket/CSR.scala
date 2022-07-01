@@ -253,7 +253,7 @@ class CSRFileIO(implicit p: Parameters) extends CoreBundle
     val tilen = UInt(xLen.W).asOutput
     val tilek = UInt(xLen.W).asOutput
     val tsidx = UInt(xLen.W).asOutput
-    val set_mconfig = Valid(new MType()).flip
+    val set_mconfig = Valid(new MConfig()).flip
     val set_tilem   = Valid(UInt(xLen.W)).flip
     val set_tilen   = Valid(UInt(xLen.W)).flip
     val set_tilek   = Valid(UInt(xLen.W)).flip
@@ -462,7 +462,7 @@ class CSRFile(
   val reg_vstart = usingVector.option(RegInit(0.U(maxVLMax.log2.W)))
   val reg_vxsat = usingVector.option(Reg(Bool()))
   val reg_vxrm = usingVector.option(Reg(UInt(io.vector.get.vxrm.getWidth.W)))
-  val reg_mconfig = usingMatrix.option(Reg(new MType))
+  val reg_mconfig = usingMatrix.option(Reg(new MConfig()))
   val reg_tilem = usingMatrix.option(RegInit(0.U(xLen.W)))
   val reg_tilen = usingMatrix.option(RegInit(0.U(xLen.W)))
   val reg_tilek = usingMatrix.option(RegInit(0.U(xLen.W)))
@@ -582,7 +582,7 @@ class CSRFile(
     CSRs.tilem -> reg_tilem.get,
     CSRs.tilen -> reg_tilen.get,
     CSRs.tilek -> reg_tilek.get,
-    CSRs.mtype -> reg_mconfig.get.asUInt,
+    CSRs.mtype -> reg_mconfig.get.mtype.asUInt,
     CSRs.tsidx -> reg_tsidx.get
   )
 
