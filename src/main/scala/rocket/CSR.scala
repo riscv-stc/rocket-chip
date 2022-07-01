@@ -253,6 +253,10 @@ class CSRFileIO(implicit p: Parameters) extends CoreBundle
     val tilen = UInt(xLen.W).asOutput
     val tilek = UInt(xLen.W).asOutput
     val tsidx = UInt(xLen.W).asOutput
+    val set_mconfig = Valid(new MType()).flip
+    val set_tilem   = Valid(UInt(xLen.W)).flip
+    val set_tilen   = Valid(UInt(xLen.W)).flip
+    val set_tilek   = Valid(UInt(xLen.W)).flip
   })
 }
 
@@ -1160,6 +1164,35 @@ class CSRFile(
       reg_vconfig.get.vl := 0.U
       reg_vconfig.get.vtype := 0.U.asTypeOf(new VType)
       reg_vconfig.get.vtype.vill := true
+    }
+  }
+
+  io.matrix.map { mio => 
+    when(mio.set_mconfig.valid) {
+      reg_mconfig.get := mio.set_mconfig.bits
+    }
+    when(mio.set_tilem.valid) {
+      reg_tilem.get := mio.set_tilem.bits
+    }
+    when(mio.set_tilen.valid) {
+      reg_tilen.get := mio.set_tilen.bits
+    }
+    when(mio.set_tilek.valid) {
+      reg_tilek.get := mio.set_tilek.bits
+    }
+    mio.mconfig := reg_mconfig.get
+    mio.tilem   := reg_tilem.get
+    mio.tilen   := reg_tilen.get
+    mio.tilek   := reg_tilek.get
+
+    when (reset.toBool) {
+      reg_mconfig.get.mill  := true.B
+      reg_mconfig.get.maccq := true.B
+      reg_mconfig.get.mlmul := 0.U
+      reg_mconfig.get.mta   := 0.U
+      reg_mconfig.get.mltr  := true.B
+      reg_mconfig.get.mrtr  := false.B
+      reg_mconfig.get.msew  := 0.U
     }
   }
 
