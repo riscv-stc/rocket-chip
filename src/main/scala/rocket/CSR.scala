@@ -248,12 +248,16 @@ class CSRFileIO(implicit p: Parameters) extends CoreBundle
   })
 
   val matrix = usingMatrix.option(new Bundle {
-    val mconfig = new MType().asOutput
+    val mconfig = new MConfig().asOutput
     val tilem = UInt(xLen.W).asOutput
     val tilen = UInt(xLen.W).asOutput
     val tilek = UInt(xLen.W).asOutput
     val tsidx = UInt(xLen.W).asOutput
   })
+}
+
+class MConfig(implicit p: Parameters) extends CoreBundle {
+  val mtype = new MType
 }
 
 class VConfig(implicit p: Parameters) extends CoreBundle {
