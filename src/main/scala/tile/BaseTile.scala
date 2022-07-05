@@ -99,7 +99,7 @@ trait HasNonDiplomaticTileParameters {
     val c = if (tileParams.core.useCompressed) "c" else ""
     val b = if (tileParams.core.useBitManip) "b" else ""
     val v = if (tileParams.core.useVector) "v" else ""
-    val mt = if (tileParams.core.useMatrix) "v" else ""
+    val mt = if (tileParams.core.useMatrix) "mt" else ""
     s"rv${p(XLen)}$ie$m$a$f$d$c$b$v$mt"
   }
 
