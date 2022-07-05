@@ -1186,13 +1186,13 @@ class CSRFile(
     mio.tilek   := reg_tilek.get
 
     when (reset.toBool) {
-      reg_mconfig.get.mill  := true.B
-      reg_mconfig.get.maccq := true.B
-      reg_mconfig.get.mlmul := 0.U
-      reg_mconfig.get.mta   := 0.U
-      reg_mconfig.get.mltr  := true.B
-      reg_mconfig.get.mrtr  := false.B
-      reg_mconfig.get.msew  := 0.U
+      reg_mconfig.get.mtype.mill  := true.B
+      reg_mconfig.get.mtype.maccq := true.B
+      reg_mconfig.get.mtype.mlmul := 0.U
+      reg_mconfig.get.mtype.mta   := 0.U
+      reg_mconfig.get.mtype.mltr  := true.B
+      reg_mconfig.get.mtype.mrtr  := false.B
+      reg_mconfig.get.mtype.msew  := 0.U
     }
   }
 
