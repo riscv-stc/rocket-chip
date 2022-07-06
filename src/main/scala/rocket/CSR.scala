@@ -430,7 +430,7 @@ class CSRFile(
 
   val reset_mnstatus = Wire(init=new MStatus().fromBits(0))
   reset_mnstatus.mpp := PRV.M
-  val reg_mnscratch = RegInit(0.U(Bits(width = xLen)))
+  val reg_mnscratch = RegInit(0.U(xLen.W))
   val reg_mnepc = Reg(UInt(width = vaddrBitsExtended))
   val reg_mncause = RegInit(0.U(xLen.W))
   val reg_mnstatus = Reg(init=reset_mnstatus)
