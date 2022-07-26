@@ -257,6 +257,7 @@ class CSRFileIO(implicit p: Parameters) extends CoreBundle
     val set_tilem   = Valid(UInt(xLen.W)).flip
     val set_tilen   = Valid(UInt(xLen.W)).flip
     val set_tilek   = Valid(UInt(xLen.W)).flip
+    val set_tsidx   = Valid(UInt(xLen.W)).flip
   })
 }
 
@@ -1180,10 +1181,14 @@ class CSRFile(
     when(mio.set_tilek.valid) {
       reg_tilek.get := mio.set_tilek.bits
     }
+    when(mio.set_tsidx.valid) {
+      reg_tsidx.get := mio.set_tsidx.bits
+    }
     mio.mconfig := reg_mconfig.get
     mio.tilem   := reg_tilem.get
     mio.tilen   := reg_tilen.get
     mio.tilek   := reg_tilek.get
+    mio.tsidx   := reg_tsidx.get
 
     when (reset.toBool) {
       reg_mconfig.get.mtype.mill  := true.B
