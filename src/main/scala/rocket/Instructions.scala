@@ -959,11 +959,6 @@ object CSRs {
   val vxsat = 0x9
   val vxrm = 0xa
   val vcsr = 0xf
-  val tilem = 0xc40
-  val tilen = 0xc41
-  val tilek = 0xc42
-  val mtype = 0xc43
-  val tsidx = 0xc44
   val uscratch = 0x40
   val uepc = 0x41
   val ucause = 0x42
@@ -1155,6 +1150,11 @@ object CSRs {
   val marchid = 0xf12
   val mimpid = 0xf13
   val mhartid = 0xf14
+  val tilem = 0xc40
+  val tilen = 0xc41
+  val tilek = 0xc42
+  val mtype = 0xc43
+  val tsidx = 0xc44
   val cycleh = 0xc80
   val timeh = 0xc81
   val instreth = 0xc82
@@ -1416,6 +1416,11 @@ object CSRs {
     res += marchid
     res += mimpid
     res += mhartid
+    res += tilem
+    res += tilen
+    res += tilek
+    res += mtype
+    res += tsidx
     res.toArray
   }
   val all32 = {
