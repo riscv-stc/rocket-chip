@@ -197,6 +197,8 @@ abstract class BaseTile private (val crossing: ClockCrossingType, q: Parameters)
   protected val tlSlaveXbar = LazyModule(new TLXbar)
   protected val intXbar = LazyModule(new IntXbar)
 
+  val vectorNode = TLIdentityNode()
+
   /** Node for broadcasting a hart id to diplomatic consumers within the tile. */
   val hartIdNexusNode: BundleBridgeNode[UInt] = BundleBroadcast[UInt](registered = p(InsertTimingClosureRegistersOnHartIds))
 
