@@ -348,7 +348,7 @@ class MType(implicit p: Parameters) extends CoreBundle {
   val mta  = Bool()
   val mltr = Bool()
   val mrtr = Bool()
-  val msew = UInt(2.W)
+  val msew = UInt(3.W)
 
   def max_msew = log2Ceil(32/8)  //support element width 8/16/32
 
