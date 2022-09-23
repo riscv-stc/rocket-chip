@@ -27,6 +27,9 @@ run-$makeTargetName: $$(addprefix $$(output_dir)/, $$(addsuffix .out, $$($makeTa
 run-$makeTargetName-debug: $$(addprefix $$(output_dir)/, $$(addsuffix .vpd, $$($makeTargetName)))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.vpd,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 
+run-$makeTargetName-fsdb: $$(addprefix $$(output_dir)/, $$(addsuffix .fsdb, $$($makeTargetName)))
+\t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.fsdb,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
+
 run-$makeTargetName-fst: $$(addprefix $$(output_dir)/, $$(addsuffix .fst, $$($makeTargetName)))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.fst,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 """
@@ -74,6 +77,8 @@ run-$kind-$env-tests: $$(addprefix $$(output_dir)/, $$(addsuffix .out, $suites))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$^ /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 run-$kind-$env-tests-debug: $$(addprefix $$(output_dir)/, $$(addsuffix .vpd, $suites))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.vpd,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
+run-$kind-$env-tests-fsdb: $$(addprefix $$(output_dir)/, $$(addsuffix .fsdb, $suites))
+\t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.fsdb,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 run-$kind-$env-tests-fst: $$(addprefix $$(output_dir)/, $$(addsuffix .fst, $suites))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.fst,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 run-$kind-$env-tests-fast: $$(addprefix $$(output_dir)/, $$(addsuffix .run, $suites))
@@ -83,6 +88,8 @@ run-$kind-tests: $$(addprefix $$(output_dir)/, $$(addsuffix .out, $targets))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$^ /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 run-$kind-tests-debug: $$(addprefix $$(output_dir)/, $$(addsuffix .vpd, $targets))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.vpd,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
+run-$kind-tests-fsdb: $$(addprefix $$(output_dir)/, $$(addsuffix .fsdb, $targets))
+\t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.fsdb,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 run-$kind-tests-fst: $$(addprefix $$(output_dir)/, $$(addsuffix .fst, $targets))
 \t@echo; perl -ne 'print "  [$$$$1] $$$$ARGV \\t$$$$2\\n" if( /\\*{3}(.{8})\\*{3}(.*)/ || /ASSERTION (FAILED):(.*)/i )' $$(patsubst %.fst,%.out,$$^) /dev/null | perl -pe 'BEGIN { $$$$failed = 0 } $$$$failed = 1 if(/FAILED/i); END { exit($$$$failed) }'
 run-$kind-tests-fast: $$(addprefix $$(output_dir)/, $$(addsuffix .run, $targets))
@@ -146,9 +153,13 @@ object DefaultTestSuites {
 
   val rv32uf = new AssemblyTestSuite("rv32uf", rv64ufNames)(_)
   val rv32ud = new AssemblyTestSuite("rv32ud", rv64ufNames - "move")(_)
+  val rv32uzfh = new AssemblyTestSuite("rv32uzfh", rv64ufNames)(_)
 
   val rv64udNames = rv64ufNames + "structural"
   val rv64ud = new AssemblyTestSuite("rv64ud", rv64udNames)(_)
+
+  val rv64uzfhNames = rv64ufNames
+  val rv64uzfh = new AssemblyTestSuite("rv64uzfh", rv64uzfhNames)(_)
 
   val rv64siNames = rv32siNames
   val rv64si = new AssemblyTestSuite("rv64si", rv64siNames)(_)

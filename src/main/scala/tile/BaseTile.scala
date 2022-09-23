@@ -99,7 +99,8 @@ trait HasNonDiplomaticTileParameters {
     val c = if (tileParams.core.useCompressed) "c" else ""
     val b = if (tileParams.core.useBitManip) "b" else ""
     val v = if (tileParams.core.useVector) "v" else ""
-    s"rv${p(XLen)}$ie$m$a$f$d$c$b$v"
+    val mt = if (tileParams.core.useMatrix) "mt" else ""
+    s"rv${p(XLen)}$ie$m$a$f$d$c$b$v$mt"
   }
 
   def tileProperties: PropertyMap = {
@@ -195,6 +196,8 @@ abstract class BaseTile private (val crossing: ClockCrossingType, q: Parameters)
   protected val tlMasterXbar = LazyModule(new TLXbar)
   protected val tlSlaveXbar = LazyModule(new TLXbar)
   protected val intXbar = LazyModule(new IntXbar)
+
+  val vectorNode = TLIdentityNode()
 
   /** Node for broadcasting a hart id to diplomatic consumers within the tile. */
   val hartIdNexusNode: BundleBridgeNode[UInt] = BundleBroadcast[UInt](registered = p(InsertTimingClosureRegistersOnHartIds))

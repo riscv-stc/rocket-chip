@@ -273,6 +273,9 @@ trait CanAttachTile {
     dataBus.coupleFrom(tileParams.name.getOrElse("tile")) { bus =>
       bus :=* crossingParams.master.injectNode(context) :=* domain.crossMasterPort(crossingParams.crossingType)
     }
+    dataBus.coupleFrom(tileParams.name.getOrElse("tile") + "vector") { bus =>
+      bus :=* domain.tile.vectorNode
+    }
   }
 
   /** Connect the port where the tile is the slave to a TileLink interconnect. */

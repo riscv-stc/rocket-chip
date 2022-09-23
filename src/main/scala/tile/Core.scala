@@ -3,7 +3,7 @@
 package freechips.rocketchip.tile
 
 import Chisel._
-
+import com.sun.jdi.BooleanValue
 import freechips.rocketchip.config._
 import freechips.rocketchip.rocket._
 import freechips.rocketchip.util._
@@ -22,7 +22,8 @@ trait CoreParams {
   val useAtomicsOnlyForIO: Boolean
   val useCompressed: Boolean
   val useBitManip: Boolean = false
-  val useVector: Boolean = false
+  val useVector: Boolean
+  val useMatrix: Boolean
   val useSCIE: Boolean
   val useRVE: Boolean
   val mulDiv: Option[MulDivParams]
@@ -60,8 +61,11 @@ trait CoreParams {
   def minFLen: Int = 32
   def vLen: Int = 0
   def sLen: Int = 0
-  def eLen(xLen: Int, fLen: Int): Int = xLen max fLen
+  def eLen: Int = 64
   def vMemDataBits: Int = 0
+  def mLen: Int = 0
+  def mxuTileRows: Int = 0
+  def mxuTileCols: Int = 0
 }
 
 trait HasCoreParameters extends HasTileParameters {
@@ -78,6 +82,7 @@ trait HasCoreParameters extends HasTileParameters {
   val usingCompressed = coreParams.useCompressed
   val usingBitManip = coreParams.useBitManip
   val usingVector = coreParams.useVector
+  val usingMatrix = coreParams.useMatrix
   val usingSCIE = coreParams.useSCIE
   val usingNMI = coreParams.useNMI
 
@@ -101,9 +106,12 @@ trait HasCoreParameters extends HasTileParameters {
 
   def vLen = coreParams.vLen
   def sLen = coreParams.sLen
-  def eLen = coreParams.eLen(xLen, fLen)
+  def eLen = coreParams.eLen
   def vMemDataBits = if (usingVector) coreParams.vMemDataBits else 0
   def maxVLMax = vLen
+  def mLen = coreParams.mLen
+  def mxuTileRows = coreParams.mxuTileRows
+  def mxuTileCols = coreParams.mxuTileCols
 
   if (usingVector) {
     require(isPow2(vLen), s"vLen ($vLen) must be a power of 2")
