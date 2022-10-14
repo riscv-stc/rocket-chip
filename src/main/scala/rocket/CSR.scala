@@ -598,6 +598,7 @@ class CSRFile(
     CSRs.tilen -> reg_tilen.get,
     CSRs.tilek -> reg_tilek.get,
     CSRs.mtype -> reg_mconfig.get.mtype.asUInt,
+    CSRs.mlenb -> (mLen / 8).U
   )
 
   read_mapping ++= debug_csrs
