@@ -253,13 +253,11 @@ class CSRFileIO(implicit p: Parameters) extends CoreBundle
     val tilem = UInt(xLen.W).asOutput
     val tilen = UInt(xLen.W).asOutput
     val tilek = UInt(xLen.W).asOutput
-    val tsidx = UInt(xLen.W).asOutput
     val set_ms_dirty = Input(Bool())
     val set_mconfig = Valid(new MConfig()).flip
     val set_tilem   = Valid(UInt(xLen.W)).flip
     val set_tilen   = Valid(UInt(xLen.W)).flip
     val set_tilek   = Valid(UInt(xLen.W)).flip
-    val set_tsidx   = Valid(UInt(xLen.W)).flip
   })
 }
 
@@ -342,12 +340,8 @@ object MType {
 
 class MType(implicit p: Parameters) extends CoreBundle {
   val mill = Bool()
+  val reserved = UInt((xLen - 5).W)
   val maccq = Bool()
-  val reserved = UInt((xLen - 10).W)
-  val mlmul = UInt(3.W)
-  val mta  = Bool()
-  val mltr = Bool()
-  val mrtr = Bool()
   val msew = UInt(3.W)
 
   def max_msew = log2Ceil(32/8)  //support element width 8/16/32
@@ -487,7 +481,6 @@ class CSRFile(
   val reg_tilem = usingMatrix.option(RegInit(0.U(xLen.W)))
   val reg_tilen = usingMatrix.option(RegInit(0.U(xLen.W)))
   val reg_tilek = usingMatrix.option(RegInit(0.U(xLen.W)))
-  val reg_tsidx = usingMatrix.option(RegInit(0.U(xLen.W)))
 
 
   val reg_mcountinhibit = RegInit(0.U((CSR.firstHPM + nPerfCounters).W))
@@ -605,7 +598,6 @@ class CSRFile(
     CSRs.tilen -> reg_tilen.get,
     CSRs.tilek -> reg_tilek.get,
     CSRs.mtype -> reg_mconfig.get.mtype.asUInt,
-    CSRs.tsidx -> reg_tsidx.get
   )
 
   read_mapping ++= debug_csrs
@@ -971,7 +963,7 @@ class CSRFile(
   }
 
     io.matrix.foreach { vio =>
-      when (vio.set_mconfig.valid || vio.set_tsidx.valid || vio.set_tilem.valid || vio.set_tilen.valid || vio.set_tilek.valid)  {
+      when (vio.set_mconfig.valid || vio.set_tilem.valid || vio.set_tilen.valid || vio.set_tilek.valid)  {
         set_ms_dirty := true
       }
   }
@@ -1268,9 +1260,6 @@ class CSRFile(
       when(decoded_addr(CSRs.tilek)) {
         set_ms_dirty := true; reg_tilek.get := wdata
       }
-      when(decoded_addr(CSRs.tsidx)) {
-        set_ms_dirty := true; reg_tsidx.get := wdata
-      }
     }
   }
   io.vector.map { vio =>
@@ -1307,22 +1296,14 @@ class CSRFile(
     when(mio.set_tilek.valid) {
       reg_tilek.get := mio.set_tilek.bits
     }
-    when(mio.set_tsidx.valid) {
-      reg_tsidx.get := mio.set_tsidx.bits
-    }
     mio.mconfig := reg_mconfig.get
     mio.tilem   := reg_tilem.get
     mio.tilen   := reg_tilen.get
     mio.tilek   := reg_tilek.get
-    mio.tsidx   := reg_tsidx.get
 
     when (reset.toBool) {
       reg_mconfig.get.mtype.mill  := true.B
       reg_mconfig.get.mtype.maccq := true.B
-      reg_mconfig.get.mtype.mlmul := 0.U
-      reg_mconfig.get.mtype.mta   := true.B
-      reg_mconfig.get.mtype.mltr  := true.B
-      reg_mconfig.get.mtype.mrtr  := false.B
       reg_mconfig.get.mtype.msew  := 0.U
     }
   }
