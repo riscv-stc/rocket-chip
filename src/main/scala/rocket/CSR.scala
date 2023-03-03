@@ -250,14 +250,26 @@ class CSRFileIO(implicit p: Parameters) extends CoreBundle
 
   val matrix = usingMatrix.option(new Bundle {
     val mconfig = new MConfig().asOutput
-    val tilem = UInt(xLen.W).asOutput
-    val tilen = UInt(xLen.W).asOutput
-    val tilek = UInt(xLen.W).asOutput
+    val tilem   = UInt(xLen.W).asOutput
+    val tilen   = UInt(xLen.W).asOutput
+    val tilek   = UInt(xLen.W).asOutput
+    val moutsh  = Output(new MShape)
+    val minsh   = Output(new MShape)
+    val mpad    = Output(new MPad)
+    val mstdi   = Output(new MStrideDilation)
+    val minsk   = Output(new MKernelPos)
+    val moutsk  = Output(new MKernelPos)
     val set_ms_dirty = Input(Bool())
     val set_mconfig = Valid(new MConfig()).flip
     val set_tilem   = Valid(UInt(xLen.W)).flip
     val set_tilen   = Valid(UInt(xLen.W)).flip
     val set_tilek   = Valid(UInt(xLen.W)).flip
+    val set_moutsh  = Valid(new MShape).flip
+    val set_minsh   = Valid(new MShape).flip
+    val set_mpad    = Valid(new MPad).flip
+    val set_mstdi   = Valid(new MStrideDilation).flip
+    val set_minsk   = Valid(new MKernelPos).flip
+    val set_moutsk  = Valid(new MKernelPos).flip
   })
 }
 
@@ -336,6 +348,7 @@ object MType {
     res.mill := mill
     res
   }
+  def mtype_value(implicit p: Parameters) = 0.U.asTypeOf(new MType)
 }
 
 class MType(implicit p: Parameters) extends CoreBundle {
@@ -346,6 +359,150 @@ class MType(implicit p: Parameters) extends CoreBundle {
 
   def max_msew = log2Ceil(32/8)  //support element width 8/16/32
 
+}
+
+object MShape {
+  def createFromUInt(that: UInt, xLen: Int)(implicit p: Parameters): MShape = {
+    val res = new MShape
+    if (xLen > 32) res.reserved := 0.U
+    res.shape_h := that(31, 16)
+    res.shape_w := that(15, 0)
+    res
+  }
+}
+
+class MShape(implicit p: Parameters) extends CoreBundle {
+  val reserved = if (xLen > 32) UInt((xLen - 32).W) else null
+  val shape_h = UInt(16.W)
+  val shape_w = UInt(16.W)
+
+  def resetFields() = {
+    if (xLen > 32) reserved := 0.U
+    shape_h := 0.U
+    shape_w := 0.U
+  }
+
+  def fromUInt(that: UInt) = {
+    if (xLen > 32) reserved := 0.U
+    shape_h := that(31, 16)
+    shape_w := that(15, 0)
+  }
+
+  def toUInt(): UInt = if (xLen > 32) Cat(reserved, shape_h, shape_w) else Cat(shape_h, shape_w)
+}
+
+object MPad {
+  def createFromUInt(that: UInt, xLen: Int)(implicit p: Parameters): MPad = {
+    val res = new MPad
+    if (xLen > 32) res.reserved := 0.U
+    res.pad_t := that(31, 24)
+    res.pad_b := that(23, 16)
+    res.pad_l := that(15, 8)
+    res.pad_r := that(7, 0)
+    res
+  }
+}
+
+class MPad(implicit p: Parameters) extends CoreBundle {
+  val reserved = if (xLen > 32) UInt((xLen - 32).W) else null
+  val pad_t = UInt(8.W)
+  val pad_b = UInt(8.W)
+  val pad_l = UInt(8.W)
+  val pad_r = UInt(8.W)
+
+  def resetFields() = {
+    if (xLen > 32) reserved := 0.U
+    pad_t := 0.U
+    pad_b := 0.U
+    pad_l := 0.U
+    pad_r := 0.U
+  }
+
+  def fromUInt(that: UInt)(implicit p: Parameters) = {
+    if (xLen > 32) reserved := 0.U
+    pad_t := that(31, 24)
+    pad_b := that(23, 16)
+    pad_l := that(15, 8)
+    pad_r := that(7, 0)
+  }
+
+  def toUInt(): UInt = if (xLen > 32) {
+    Cat(reserved, pad_t, pad_b, pad_l, pad_r)
+  } else {
+    Cat(pad_t, pad_b, pad_l, pad_r)
+  }
+}
+
+object MStrideDilation {
+  def createFromUInt(that: UInt, xLen: Int)(implicit p: Parameters): MStrideDilation = {
+    val res = new MStrideDilation
+    if (xLen > 32) res.reserved := 0.U
+    res.dilation_h := that(31, 24)
+    res.dilation_w := that(23, 16)
+    res.stride_h := that(15, 8)
+    res.stride_w := that(7, 0)
+    res
+  }
+}
+
+class MStrideDilation(implicit p: Parameters) extends CoreBundle {
+  val reserved = if (xLen > 32) UInt((xLen - 32).W) else null
+  val dilation_h = UInt(8.W)
+  val dilation_w = UInt(8.W)
+  val stride_h = UInt(8.W)
+  val stride_w = UInt(8.W)
+
+  def resetFields() = {
+    if (xLen > 32) reserved := 0.U
+    dilation_h := 0.U
+    dilation_w := 0.U
+    stride_h := 0.U
+    stride_w := 0.U
+  }
+
+  def fromUInt(that: UInt)(implicit p: Parameters) = {
+    if (xLen > 32) reserved := 0.U
+    dilation_h := that(31, 24)
+    dilation_w := that(23, 16)
+    stride_h := that(15, 8)
+    stride_w := that(7, 0)
+  }
+
+  def toUInt(): UInt = if (xLen > 32) {
+    Cat(reserved, dilation_h, dilation_w, stride_h, stride_w)
+  } else {
+    Cat(dilation_h, dilation_w, stride_h, stride_w)
+  }
+}
+
+object MKernelPos {
+  def createFromUInt(that: UInt, xLen: Int)(implicit p: Parameters): MKernelPos = {
+    val res = new MKernelPos
+    if (xLen > 32) res.reserved := 0.U
+    res.pos_h := that(31, 16)
+    res.pos_w := that(15, 0)
+    res
+  }
+}
+
+class MKernelPos(implicit p: Parameters) extends CoreBundle {
+  val reserved = if (xLen > 32) UInt((xLen - 32).W) else null
+  val pos_h = UInt(16.W)
+  val pos_w = UInt(16.W)
+
+  def resetFields() = {
+    if (xLen > 32) reserved := 0.U
+    pos_h := 0.U
+    pos_w := 0.U
+  }
+
+  def fromUInt(that: UInt)(implicit p: Parameters) = {
+    if (xLen > 32) reserved := 0.U
+    pos_h := that(31, 16)
+    pos_w := that(15, 0)
+  }
+
+  def toUInt(): UInt = if (xLen > 32) Cat(reserved, pos_h, pos_w) else Cat(pos_h, pos_w)
 }
 
 class CSRFile(
@@ -482,6 +639,12 @@ class CSRFile(
   val reg_tilen = usingMatrix.option(RegInit(0.U(xLen.W)))
   val reg_tilek = usingMatrix.option(RegInit(0.U(xLen.W)))
 
+  val reg_moutsh = usingMatrix.option(Reg(new MShape))
+  val reg_minsh  = usingMatrix.option(Reg(new MShape))
+  val reg_mpad   = usingMatrix.option(Reg(new MPad))
+  val reg_mstdi  = usingMatrix.option(Reg(new MStrideDilation))
+  val reg_minsk  = usingMatrix.option(Reg(new MKernelPos))
+  val reg_moutsk = usingMatrix.option(Reg(new MKernelPos))
 
   val reg_mcountinhibit = RegInit(0.U((CSR.firstHPM + nPerfCounters).W))
   io.inhibit_cycle := reg_mcountinhibit(0)
@@ -598,7 +761,13 @@ class CSRFile(
     CSRs.tilen -> reg_tilen.get,
     CSRs.tilek -> reg_tilek.get,
     CSRs.mtype -> reg_mconfig.get.mtype.asUInt,
-    CSRs.mlenb -> (mLen / 8).U
+    CSRs.mlenb -> (mLen / 8).U,
+    CSRs.moutsh -> reg_moutsh.get.toUInt,
+    CSRs.minsh -> reg_minsh.get.toUInt,
+    CSRs.mpad -> reg_mpad.get.toUInt,
+    CSRs.mstdi -> reg_mstdi.get.toUInt,
+    CSRs.minsk -> reg_minsk.get.toUInt,
+    CSRs.moutsk -> reg_moutsk.get.toUInt
   )
 
   read_mapping ++= debug_csrs
@@ -963,10 +1132,12 @@ class CSRFile(
     }
   }
 
-    io.matrix.foreach { vio =>
-      when (vio.set_mconfig.valid || vio.set_tilem.valid || vio.set_tilen.valid || vio.set_tilek.valid)  {
-        set_ms_dirty := true
-      }
+  io.matrix.foreach { mio =>
+    when (mio.set_mconfig.valid || mio.set_tilem.valid || mio.set_tilen.valid || mio.set_tilek.valid
+       || mio.set_moutsh.valid  || mio.set_minsh.valid || mio.set_mpad.valid  || mio.set_mstdi.valid
+       || mio.set_minsk.valid   || mio.set_moutsk.valid)  {
+      set_ms_dirty := true
+    }
   }
 
   val csr_wen = io.rw.cmd.isOneOf(CSR.S, CSR.C, CSR.W)
@@ -1261,6 +1432,30 @@ class CSRFile(
       when(decoded_addr(CSRs.tilek)) {
         set_ms_dirty := true; reg_tilek.get := wdata
       }
+      when(decoded_addr(CSRs.moutsh)) {
+        set_ms_dirty := true;
+        reg_moutsh.get.fromUInt(wdata)
+      }
+      when(decoded_addr(CSRs.minsh)) {
+        set_ms_dirty := true;
+        reg_minsh.get.fromUInt(wdata)
+      }
+      when(decoded_addr(CSRs.mpad)) {
+        set_ms_dirty := true;
+        reg_mpad.get.fromUInt(wdata)
+      }
+      when(decoded_addr(CSRs.mstdi)) {
+        set_ms_dirty := true;
+        reg_mstdi.get.fromUInt(wdata)
+      }
+      when(decoded_addr(CSRs.minsk)) {
+        set_ms_dirty := true;
+        reg_minsk.get.fromUInt(wdata)
+      }
+      when(decoded_addr(CSRs.moutsk)) {
+        set_ms_dirty := true;
+        reg_moutsk.get.fromUInt(wdata)
+      }
     }
   }
   io.vector.map { vio =>
@@ -1297,15 +1492,46 @@ class CSRFile(
     when(mio.set_tilek.valid) {
       reg_tilek.get := mio.set_tilek.bits
     }
+    when(mio.set_moutsh.valid) {
+      reg_moutsh.get := mio.set_moutsh.bits
+    }
+    when(mio.set_minsh.valid) {
+      reg_minsh.get := mio.set_minsh.bits
+    }
+    when(mio.set_mpad.valid) {
+      reg_mpad.get := mio.set_mpad.bits
+    }
+    when(mio.set_mstdi.valid) {
+      reg_mstdi.get := mio.set_mstdi.bits
+    }
+    when(mio.set_minsk.valid) {
+      reg_minsk.get := mio.set_minsk.bits
+    }
+    when(mio.set_moutsk.valid) {
+      reg_moutsk.get := mio.set_moutsk.bits
+    }
+
     mio.mconfig := reg_mconfig.get
     mio.tilem   := reg_tilem.get
     mio.tilen   := reg_tilen.get
     mio.tilek   := reg_tilek.get
+    mio.moutsh  := reg_moutsh.get
+    mio.minsh   := reg_minsh.get
+    mio.mpad    := reg_mpad.get
+    mio.mstdi   := reg_mstdi.get
+    mio.minsk   := reg_minsk.get
+    mio.moutsk  := reg_moutsk.get
 
     when (reset.toBool) {
       reg_mconfig.get.mtype.mill  := true.B
       reg_mconfig.get.mtype.maccq := true.B
       reg_mconfig.get.mtype.msew  := 0.U
+      reg_moutsh.get.resetFields()
+      reg_minsh.get.resetFields()
+      reg_mpad.get.resetFields()
+      reg_mstdi.get.resetFields()
+      reg_minsk.get.resetFields()
+      reg_moutsk.get.resetFields()
     }
   }
 
