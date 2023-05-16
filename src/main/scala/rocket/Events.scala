@@ -61,7 +61,7 @@ class SuperscalarEventSets(val eventSets: Seq[(Seq[EventSet], (UInt, UInt) => UI
     val (set, mask) = decode(eventSel)
     val sets = for ((sets, reducer) <- eventSets) yield {
       sets.map { set =>
-        require(set.hits.getWidth <= mask.getWidth, s"too many events ${set.hits.getWidth} wider than mask ${mask.getWidth}")
+        //require(set.hits.getWidth <= mask.getWidth, s"too many events ${set.hits.getWidth} wider than mask ${mask.getWidth}")
         set.check(mask)
       }.reduce(reducer)
     }

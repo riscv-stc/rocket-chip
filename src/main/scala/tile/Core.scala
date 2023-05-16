@@ -112,6 +112,8 @@ trait HasCoreParameters extends HasTileParameters {
   def maxVLMax = vLen
   def mLen = coreParams.mLen
   def rLen = coreParams.rLen
+  def accMLen = mLen * 2
+  def accRLen = rLen * 2
   def mxuTileRows = coreParams.mxuTileRows
   def mxuTileCols = coreParams.mxuTileCols
 

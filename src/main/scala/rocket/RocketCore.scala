@@ -25,6 +25,7 @@ case class RocketCoreParams(
   useCompressed: Boolean = true,
   useVector: Boolean = false,
   useMatrix: Boolean = false,
+  useInnerProd: Boolean = false,
   useRVE: Boolean = false,
   useSCIE: Boolean = false,
   nLocalInterrupts: Int = 0,
